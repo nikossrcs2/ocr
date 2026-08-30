@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebGPU Neural OCR Pro</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #121212;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            margin: 0;
+            user-select: none;
+        }
+        h2, h3 { margin: 5px 0 10px 0; font-size: 18px; text-align: center; }
+        .nav {
+            display: flex;
+            gap: 5px;
+            width: 100%;
+            max-width: 360px;
+            margin-bottom: 10px;
+        }
+        .nav button {
+            flex: 1;
+            padding: 10px 4px;
+            font-size: 11px;
+            background: #2c2c2e;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .nav button.active { background: #0a84ff; }
+        .tab { display: none; width: 100%; max-width: 360px; flex-direction: column; align-items: center; }
+        .tab.active { display: flex; }
+
+        canvas {
+            border: 2px solid #333;
+            background: #000;
+            border-radius: 12px;
+            touch-action: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .controls { display: flex; gap: 8px; margin-top: 10px; width: 100%; }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            background: #2c2c2e;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.7; }
+        .save-btn { background: #0a84ff; }
+        .clear-btn { background: #ff453a; }
+        .action-btn { background: #30d158; color: #000; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1c1c1e;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        #output { margin-top: 10px; font-size: 16px; font-weight: bold; color: #30d158; text-align: center; word-break: break-all; }
+        #stats { margin-top: 6px; font-size: 12px; color: #8e8e93; text-align: center; }
+        #warnBanner {
+            display: none;
+            width: 100%;
+            max-width: 360px;
+            background: #3a2a00;
+            border: 1px solid #ffcc00;
+            color: #ffcc00;
+            font-size: 11px;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* Training Grid Table */
+        .alphabet-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 5px;
+            background: #1c1c1e;
+            border-radius: 8px;
+        }
+        .grid-cell {
+            padding: 8px 0;
+            background: #2c2c2e;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .grid-cell.trained { border: 1px solid #30d158; color: #30d158; }
+        .grid-cell.un-trained { opacity: 0.4; }
+
+        #sampleViewer {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+            background: #1c1c1e;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .sample-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            margin: 10px 0;
+            padding: 4px;
+            background: #000;
+            border-radius: 6px;
+        }
+        .sample-tile {
+            position: relative;
+            width: 52px;
+            height: 52px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+            flex: none;
+        }
+        .sample-tile img { width: 100%; height: 100%; object-fit: contain; }
+        .sample-delete-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 18px;
+            height: 18px;
+            line-height: 16px;
+            background: #ff453a;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 0;
+            flex: none;
+        }
+
+        /* Auto Training Prompt Banner */
+        .prompt-card {
+            background: #1c1c1e;
+            border: 1px solid #0a84ff;
+            border-radius: 8px;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .prompt-card h4 { margin: 0; color: #8e8e93; font-size: 12px; }
+        .prompt-card .target { font-size: 28px; font-weight: bold; color: #0a84ff; margin: 4px 0; }
+
+        input[type="file"] { display: none; }
+        .file-upload-label {
+            width: 100%;
+            padding: 12px;
+            background: #2c2c2e;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
+            border: 1px dashed #0a84ff;
+        }
+
+        /* Toggle switch */
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #3a3a3c; transition: .2s; border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background-color: white; transition: .2s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #30d158; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Model Size Selector */
+        .model-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            width: 100%;
+            margin: 10px 0;
+            justify-content: center;
+        }
+        .model-selector button {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px 4px;
+            font-size: 11px;
+            background: #2c2c2e;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }
+        .model-selector button.active {
+            border-color: #0a84ff;
+            background: #1c3a5e;
+        }
+        .model-selector button:disabled {
+            opacity: 0.4;
+        }
+        .model-selector button.recommended {
+            border-color: #30d158;
+        }
+        .model-selector .size-label {
+            font-size: 8px;
+            opacity: 0.6;
+            display: block;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>⚡ WebGPU Neural OCR Pro</h2>
+    <div id="warnBanner">⚠️ Local storage isn't available here (private mode / file:// / blocked). Your trained patterns will only be kept for this session and won't be saved after you close the page.</div>
+
+    <div class="nav">
+        <button id="btn-tab-single" class="active" onclick="switchTab('single')">Single</button>
+        <button id="btn-tab-guided" onclick="switchTab('guided')">A-Z Trainer</button>
+        <button id="btn-tab-doc" onclick="switchTab('doc')">Full File</button>
+        <button id="btn-tab-table" onclick="switchTab('table')">Grid</button>
+    </div>
+    <div class="nav" style="margin-top: -4px;">
+        <button id="btn-tab-type" onclick="switchTab('type')">Type→Handwriting</button>
+        <button id="btn-tab-settings" onclick="switchTab('settings')">⚙️ Settings</button>
+    </div>
+
+    <!-- TAB 1: SINGLE CHARACTER TRAINER -->
+    <div id="tab-single" class="tab active">
+        <canvas id="canvasSingle" width="280" height="280"></canvas>
+        <input type="text" id="charInput" placeholder="Target letter (A, a, ä, ß...)" maxlength="2" autocomplete="off">
+        <div class="controls">
+            <button class="clear-btn" onclick="clearCanvas('canvasSingle')">Clear</button>
+            <button onclick="recognizeSingle()">Recognize</button>
+            <button class="save-btn" onclick="saveSingle()">Save</button>
+        </div>
+    </div>
+
+    <!-- TAB 2: GUIDED AUTOMATIC TRAINER -->
+    <div id="tab-guided" class="tab">
+        <div class="prompt-card">
+            <h4>DRAW THIS CHARACTER BELOW:</h4>
+            <div class="target" id="guidedTarget">A</div>
+            <div id="guidedStatus" style="font-size:12px; color:#aaa;">Draw, then tap 'Verify & Next'</div>
+        </div>
+        <canvas id="canvasGuided" width="280" height="240"></canvas>
+        <div class="controls">
+            <button class="clear-btn" onclick="clearCanvas('canvasGuided')">Clear</button>
+            <button class="action-btn" onclick="processGuidedStep()">Verify & Next</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: FULL FILE OCR WITH CONNECTED COMPONENT SEGMENTATION -->
+    <div id="tab-doc" class="tab">
+        <canvas id="canvasDoc" width="340" height="220"></canvas>
+        <label class="file-upload-label" for="docLoader">📁 Upload Document Image</label>
+        <input type="file" id="docLoader" accept="image/*" onchange="loadDocImage(event)">
+        <div class="controls">
+            <button class="clear-btn" onclick="clearDoc()">Clear Barriers</button>
+            <button class="action-btn" onclick="runDocOCR()">Scan Text</button>
+        </div>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Connected-component extraction merges dots/umlauts above letters automatically.
+            <b>Tap canvas</b> to draw vertical split barriers for touching characters.
+        </p>
+    </div>
+
+    <!-- TAB 4: TRAINING MATRIX / COVERAGE TABLE -->
+    <div id="tab-table" class="tab">
+        <h3>Character Training Matrix</h3>
+        <p style="font-size: 11px; color: #8e8e93; margin: -6px 0 0 0; text-align: center;">
+            Tap a trained character to view and delete individual samples.
+        </p>
+        <div id="gridContainer" class="alphabet-grid"></div>
+
+        <div id="sampleViewer">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4 id="sampleViewerTitle" style="margin:0; font-size:14px;"></h4>
+                <button style="flex:none; padding:6px 10px; font-size:12px;" onclick="closeSampleViewer()">✕ Close</button>
+            </div>
+            <div id="sampleGrid" class="sample-grid"></div>
+            <button class="clear-btn" style="width:100%;" onclick="deleteAllForSelectedChar()">🗑️ Delete All for This Character</button>
+        </div>
+
+        <button style="background: #ff453a; margin-top: 15px; width: 100%;" onclick="clearDB()">Reset DB</button>
+    </div>
+
+    <!-- TAB 5: TEXT -> HANDWRITING RENDERER -->
+    <div id="tab-type" class="tab">
+        <h3>Type it, see it "handwritten"</h3>
+        <input type="text" id="typeInput" placeholder="Type something..." autocomplete="off" style="margin-top:0;">
+        <div class="controls">
+            <button class="action-btn" onclick="renderHandwriting()">Handwrite It</button>
+            <button class="clear-btn" onclick="clearHandwriteCanvas()">Clear</button>
+        </div>
+        <canvas id="canvasHandwrite" width="340" height="220" style="margin-top:10px;"></canvas>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Pulls a random saved sample for each letter from your trained database and stitches them together.
+            Untrained characters show as a dashed gap.
+        </p>
+    </div>
+
+    <!-- TAB 6: SETTINGS -->
+    <div id="tab-settings" class="tab">
+        <h3>Settings</h3>
+        <div class="prompt-card" style="text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">OCR Premium ✨</div>
+                    <div style="font-size:11px; color:#8e8e93; max-width:230px;">
+                        Unlocks enhanced detection accuracy powered by our proprietary Z-Vision™ engine.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="premiumToggle" onchange="togglePremium()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <p id="premiumStatus" style="font-size: 12px; color: #8e8e93; text-align: center;"></p>
+
+        <h3 style="margin-top:20px;">🧠 Neural Network Model Size</h3>
+        <p style="font-size: 11px; color: #8e8e93; margin: -4px 0 8px 0; text-align: center;">
+            Larger models are smarter but use more GPU memory. iPhone 15 can handle up to 1024 neurons.
+        </p>
+        <div class="model-selector" id="modelSizeSelector">
+            <button data-size="16" onclick="setModelSize(16)">Tiny<br><span class="size-label">XS Max</span></button>
+            <button data-size="32" onclick="setModelSize(32)">Small<br><span class="size-label">iPhone 12</span></button>
+            <button data-size="64" onclick="setModelSize(64)">Medium<br><span class="size-label">iPhone 13</span></button>
+            <button data-size="128" onclick="setModelSize(128)">Large<br><span class="size-label">iPhone 14</span></button>
+            <button data-size="256" onclick="setModelSize(256)" class="recommended">Pro<br><span class="size-label">iPhone 15</span></button>
+            <button data-size="512" onclick="setModelSize(512)">Ultra<br><span class="size-label">iPhone 15 Pro</span></button>
+            <button data-size="1024" onclick="setModelSize(1024)">Max<br><span class="size-label">iPad M1+</span></button>
+        </div>
+        <p id="modelSizeStatus" style="font-size: 12px; color: #8e8e93; text-align: center;">Current: 64 neurons</p>
+        <p id="gpuMemoryStatus" style="font-size: 11px; color: #ff9f0a; text-align: center;"></p>
+
+        <h3 style="margin-top:20px;">Real OCR 🧠</h3>
+        <div class="prompt-card" style="text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">WebGPU Neural Engine</div>
+                    <div style="font-size:11px; color:#8e8e93; max-width:230px;">
+                        Trains a 2-layer MLP on your samples, accelerated by your device's GPU.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="realOcrToggle" onchange="toggleRealOcr()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <p id="realOcrStatus" style="font-size: 12px; color: #8e8e93; text-align: center;"></p>
+        <button class="action-btn" style="width:100%; margin-top:6px;" onclick="retrainModel()">🔄 Retrain WebGPU Model</button>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Needs at least 2 different trained characters. Retraining uses WebGPU compute shaders.
+        </p>
+
+        <h3 style="margin-top:20px;">Backup & Transfer</h3>
+        <div class="controls">
+            <button class="action-btn" onclick="exportTrainedData()">Export .zoodle</button>
+            <label class="file-upload-label" for="zoodleLoader" style="flex:1; margin-top:0; display:flex; align-items:center; justify-content:center;">📥 Import .zoodle</label>
+            <input type="file" id="zoodleLoader" accept=".zoodle,text/plain" onchange="importTrainedData(event)">
+        </div>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 8px; text-align: center;">
+            Exports your trained samples as a <b>.zoodle</b> file.
+        </p>
+    </div>
+
+    <div id="output"></div>
+    <div id="stats">Saved patterns: 0</div>
+
+    <script>
+        // ============================================================
+        // 1. STORAGE LAYER
+        // ============================================================
+        const storage = (function () {
+            let available = false;
+            try {
+                const testKey = '__storage_test__';
+                window.localStorage.setItem(testKey, '1');
+                window.localStorage.removeItem(testKey);
+                available = true;
+            } catch (e) { available = false; }
+
+            let memoryFallback = null;
+
+            return {
+                isAvailable: available,
+                get(key) {
+                    if (available) {
+                        try { return window.localStorage.getItem(key); } catch (e) {}
+                    }
+                    return memoryFallback;
+                },
+                set(key, value) {
+                    if (available) {
+                        try { window.localStorage.setItem(key, value); return; } catch (e) {}
+                    }
+                    memoryFallback = value;
+                },
+                remove(key) {
+                    if (available) {
+                        try { window.localStorage.removeItem(key); } catch (e) {}
+                    }
+                    memoryFallback = null;
+                }
+            };
+        })();
+
+        // ============================================================
+        // 2. GLOBALS
+        // ============================================================
+        let db = [];
+        try { db = JSON.parse(storage.get('custom_ocr_db') || '[]'); } catch (e) { db = []; }
+
+        let premiumMode = storage.get('ocr_premium') === 'true';
+        let realOcrMode = storage.get('real_ocr_mode') !== 'false';
+        let hiddenSize = parseInt(storage.get('model_hidden_size') || '256'); // Default to Pro (256) for iPhone 15
+        let modelData = null;
+        let isTraining = false;
+        let retrainDebounceTimer = null;
+        let guidedIndex = 0;
+        let docImg = null;
+        let manualBarriers = [];
+
+        // WebGPU state
+        let gpuAvailable = false;
+        let gpuDevice = null;
+        let gpuComputePipeline = null;
+
+        const INPUT_SIZE = 784;
+
+        // ============================================================
+        // 3. PERSISTENCE
+        // ============================================================
+        function persistDb() {
+            try { storage.set('custom_ocr_db', JSON.stringify(db)); } catch (e) {}
+        }
+
+        function persistModel() {
+            if (modelData) {
+                try { storage.set('custom_ocr_model', JSON.stringify(modelData)); } catch (e) {}
+            }
+        }
+
+        function persistHiddenSize() {
+            try { storage.set('model_hidden_size', String(hiddenSize)); } catch (e) {}
+        }
+
+        // ============================================================
+        // 4. VECTOR EXTRACTION
+        // ============================================================
+        function getCanvasBoundingBox(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+            let found = false;
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const idx = (y * canvas.width + x) * 4;
+                    if (imgData[idx + 3] > 30) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        found = true;
+                    }
+                }
+            }
+            if (!found) return { minX: 0, minY: 0, maxX: canvas.width, maxY: canvas.height };
+            return { minX, minY, maxX, maxY };
+        }
+
+        function extractVectorFromBoundingBox(sourceCanvas, box) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+            const pad = 4;
+            const srcX = Math.max(0, box.minX - pad);
+            const srcY = Math.max(0, box.minY - pad);
+            const srcW = Math.min(sourceCanvas.width - srcX, (box.maxX - box.minX) + pad * 2);
+            const srcH = Math.min(sourceCanvas.height - srcY, (box.maxY - box.minY) + pad * 2);
+            tCtx.drawImage(sourceCanvas, srcX, srcY, srcW, srcH, 2, 2, 24, 24);
+            const imgData = tCtx.getImageData(0, 0, 28, 28).data;
+            const vector = [];
+            for (let i = 0; i < imgData.length; i += 4) {
+                vector.push(imgData[i + 3] / 255.0);
+            }
+            return vector;
+        }
+
+        // ============================================================
+        // 5. WebGPU SETUP
+        // ============================================================
+        async function initWebGPU() {
+            try {
+                if (!navigator.gpu) {
+                    console.warn('WebGPU not available');
+                    gpuAvailable = false;
+                    return false;
+                }
+                const adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    console.warn('No WebGPU adapter found');
+                    gpuAvailable = false;
+                    return false;
+                }
+                gpuDevice = await adapter.requestDevice();
+                gpuAvailable = true;
+                console.log('WebGPU initialized successfully');
+                return true;
+            } catch (e) {
+                console.warn('WebGPU init failed:', e);
+                gpuAvailable = false;
+                return false;
+            }
+        }
+
+        function buildComputePipeline(device, numClasses, hiddenSize) {
+            const shaderCode = `
+                @group(0) @binding(0) var<storage, read> input: array<f32>;
+                @group(0) @binding(1) var<storage, read> W1: array<f32>;
+                @group(0) @binding(2) var<storage, read> b1: array<f32>;
+                @group(0) @binding(3) var<storage, read> W2: array<f32>;
+                @group(0) @binding(4) var<storage, read> b2: array<f32>;
+                @group(0) @binding(5) var<storage, read_write> output: array<f32>;
+
+                @compute @workgroup_size(64)
+                fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+                    let sampleIdx = id.x;
+                    if (sampleIdx >= 1u) { return; }
+
+                    const inputSize = 784u;
+                    const hiddenSize = ${hiddenSize}u;
+                    const numClasses = ${numClasses}u;
+
+                    var hidden: array<f32, 1024>;
+                    let base = sampleIdx * inputSize;
+
+                    // Hidden layer: h = ReLU(W1 * x + b1)
+                    for (var i: u32 = 0u; i < hiddenSize; i = i + 1u) {
+                        var sum = b1[i];
+                        let wBase = i * inputSize;
+                        for (var j: u32 = 0u; j < inputSize; j = j + 1u) {
+                            sum += W1[wBase + j] * input[base + j];
+                        }
+                        hidden[i] = max(0.0, sum);
+                    }
+
+                    // Output layer: logits = W2 * h + b2
+                    let outBase = sampleIdx * numClasses;
+                    for (var k: u32 = 0u; k < numClasses; k = k + 1u) {
+                        var sum = b2[k];
+                        let wBase = k * hiddenSize;
+                        for (var i: u32 = 0u; i < hiddenSize; i = i + 1u) {
+                            sum += W2[wBase + i] * hidden[i];
+                        }
+                        output[outBase + k] = sum;
+                    }
+                }
+            `;
+
+            const module = device.createShaderModule({ code: shaderCode });
+            const pipeline = device.createComputePipeline({
+                layout: 'auto',
+                compute: { module, entryPoint: 'main' }
+            });
+            return pipeline;
+        }
+
+        // CPU fallback
+        function cpuInference(vector, model) {
+            if (!model || !model.classes || model.classes.length === 0) return '?';
+            const { W1, b1, W2, b2, classes, hiddenSize: hSize } = model;
+            const h = new Array(hSize);
+            for (let i = 0; i < hSize; i++) {
+                let sum = b1[i];
+                const w = W1[i];
+                for (let j = 0; j < vector.length; j++) sum += w[j] * vector[j];
+                h[i] = sum > 0 ? sum : 0;
+            }
+            let best = 0;
+            let bestVal = -Infinity;
+            for (let k = 0; k < classes.length; k++) {
+                let sum = b2[k];
+                const w = W2[k];
+                for (let i = 0; i < hSize; i++) sum += w[i] * h[i];
+                if (sum > bestVal) { bestVal = sum; best = k; }
+            }
+            return classes[best];
+        }
+
+        async function classifyWithGPU(vector) {
+            if (!gpuAvailable || !gpuDevice || !modelData) {
+                return cpuInference(vector, modelData);
+            }
+            try {
+                const numClasses = modelData.classes.length;
+                const hSize = modelData.hiddenSize;
+                const inputSize = INPUT_SIZE;
+                const batchSize = 1;
+
+                const inputBuffer = gpuDevice.createBuffer({
+                    size: batchSize * inputSize * Float32Array.BYTES_PER_ELEMENT,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+                const outputBuffer = gpuDevice.createBuffer({
+                    size: batchSize * numClasses * Float32Array.BYTES_PER_ELEMENT,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                });
+
+                const inputArray = new Float32Array(vector);
+                gpuDevice.queue.writeBuffer(inputBuffer, 0, inputArray);
+
+                const bindGroup = gpuDevice.createBindGroup({
+                    layout: gpuComputePipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: { buffer: inputBuffer } },
+                        { binding: 1, resource: { buffer: modelData.gpuW1 } },
+                        { binding: 2, resource: { buffer: modelData.gpuB1 } },
+                        { binding: 3, resource: { buffer: modelData.gpuW2 } },
+                        { binding: 4, resource: { buffer: modelData.gpuB2 } },
+                        { binding: 5, resource: { buffer: outputBuffer } },
+                    ]
+                });
+
+                let encoder = gpuDevice.createCommandEncoder();
+                const pass = encoder.beginComputePass();
+                pass.setPipeline(gpuComputePipeline);
+                pass.setBindGroup(0, bindGroup);
+                pass.dispatchWorkgroups(1);
+                pass.end();
+                gpuDevice.queue.submit([encoder.finish()]);
+
+                const readBuffer = gpuDevice.createBuffer({
+                    size: batchSize * numClasses * Float32Array.BYTES_PER_ELEMENT,
+                    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+                });
+                encoder = gpuDevice.createCommandEncoder();
+                encoder.copyBufferToBuffer(outputBuffer, 0, readBuffer, 0, readBuffer.size);
+                gpuDevice.queue.submit([encoder.finish()]);
+
+                await readBuffer.mapAsync(GPUMapMode.READ);
+                const result = new Float32Array(readBuffer.getMappedRange());
+                readBuffer.unmap();
+
+                let best = 0;
+                for (let k = 1; k < numClasses; k++) {
+                    if (result[k] > result[best]) best = k;
+                }
+
+                inputBuffer.destroy();
+                outputBuffer.destroy();
+                readBuffer.destroy();
+
+                // CRITICAL FIX: Always use the current classes array from modelData
+                return modelData.classes[best];
+            } catch (e) {
+                console.warn('GPU inference failed, falling back to CPU:', e);
+                return cpuInference(vector, modelData);
+            }
+        }
+
+        // ============================================================
+        // 6. MODEL TRAINING - FIXED CLASS MAPPING
+        // ============================================================
+        function buildTrainingSet() {
+            // Build classes from current db - THIS MUST ALWAYS BE IN SYNC
+            const classes = [...new Set(db.map(e => e.char))].sort();
+            const classIndex = {};
+            classes.forEach((c, i) => { classIndex[c] = i; });
+            const X = db.map(e => e.vector);
+            const Y = db.map(e => classIndex[e.char]);
+            return { classes, classIndex, X, Y };
+        }
+
+        function initNetworkCPU(inputSize, hiddenSize, numClasses) {
+            const randArr = (n, scale) => Array.from({ length: n }, () => (Math.random() * 2 - 1) * scale);
+            const scale1 = Math.sqrt(2 / inputSize);
+            const scale2 = Math.sqrt(2 / hiddenSize);
+            return {
+                inputSize, hiddenSize, numClasses,
+                W1: Array.from({ length: hiddenSize }, () => randArr(inputSize, scale1)),
+                b1: new Array(hiddenSize).fill(0),
+                W2: Array.from({ length: numClasses }, () => randArr(hiddenSize, scale2)),
+                b2: new Array(numClasses).fill(0),
+            };
+        }
+
+        function forwardPassCPU(net, x) {
+            const { W1, b1, W2, b2, hiddenSize, numClasses } = net;
+            const h = new Array(hiddenSize);
+            for (let i = 0; i < hiddenSize; i++) {
+                let sum = b1[i];
+                const w = W1[i];
+                for (let j = 0; j < x.length; j++) sum += w[j] * x[j];
+                h[i] = sum > 0 ? sum : 0;
+            }
+            const logits = new Array(numClasses);
+            for (let k = 0; k < numClasses; k++) {
+                let sum = b2[k];
+                const w = W2[k];
+                for (let i = 0; i < hiddenSize; i++) sum += w[i] * h[i];
+                logits[k] = sum;
+            }
+            return { h, logits };
+        }
+
+        function trainStepCPU(net, x, yIndex, lr) {
+            const { h, logits } = forwardPassCPU(net, x);
+            const { hiddenSize, numClasses } = net;
+
+            let maxLogit = -Infinity;
+            for (let k = 0; k < numClasses; k++) if (logits[k] > maxLogit) maxLogit = logits[k];
+            let expSum = 0;
+            const probs = new Array(numClasses);
+            for (let k = 0; k < numClasses; k++) {
+                probs[k] = Math.exp(logits[k] - maxLogit);
+                expSum += probs[k];
+            }
+            for (let k = 0; k < numClasses; k++) probs[k] /= expSum;
+
+            const dOut = probs.slice();
+            dOut[yIndex] -= 1;
+
+            const dH = new Array(hiddenSize).fill(0);
+            for (let k = 0; k < numClasses; k++) {
+                const g = dOut[k];
+                if (g === 0) continue;
+                const w2k = net.W2[k];
+                for (let i = 0; i < hiddenSize; i++) {
+                    dH[i] += g * w2k[i];
+                    w2k[i] -= lr * g * h[i];
+                }
+                net.b2[k] -= lr * g;
+            }
+            for (let i = 0; i < hiddenSize; i++) {
+                if (h[i] <= 0) continue;
+                const g = dH[i];
+                if (g === 0) continue;
+                const w1i = net.W1[i];
+                for (let j = 0; j < x.length; j++) {
+                    w1i[j] -= lr * g * x[j];
+                }
+                net.b1[i] -= lr * g;
+            }
+        }
+
+        async function uploadModelToGPU(net, classes) {
+            if (!gpuAvailable || !gpuDevice) return null;
+
+            try {
+                const hSize = net.hiddenSize;
+                const numClasses = net.numClasses;
+                const inputSize = net.inputSize;
+
+                const W1flat = new Float32Array(hSize * inputSize);
+                for (let i = 0; i < hSize; i++) {
+                    for (let j = 0; j < inputSize; j++) {
+                        W1flat[i * inputSize + j] = net.W1[i][j];
+                    }
+                }
+                const b1flat = new Float32Array(net.b1);
+                const W2flat = new Float32Array(numClasses * hSize);
+                for (let k = 0; k < numClasses; k++) {
+                    for (let i = 0; i < hSize; i++) {
+                        W2flat[k * hSize + i] = net.W2[k][i];
+                    }
+                }
+                const b2flat = new Float32Array(net.b2);
+
+                const gpuW1 = gpuDevice.createBuffer({
+                    size: W1flat.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+                const gpuB1 = gpuDevice.createBuffer({
+                    size: b1flat.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+                const gpuW2 = gpuDevice.createBuffer({
+                    size: W2flat.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+                const gpuB2 = gpuDevice.createBuffer({
+                    size: b2flat.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+
+                gpuDevice.queue.writeBuffer(gpuW1, 0, W1flat);
+                gpuDevice.queue.writeBuffer(gpuB1, 0, b1flat);
+                gpuDevice.queue.writeBuffer(gpuW2, 0, W2flat);
+                gpuDevice.queue.writeBuffer(gpuB2, 0, b2flat);
+
+                return { gpuW1, gpuB1, gpuW2, gpuB2 };
+            } catch (e) {
+                console.warn('Failed to upload model to GPU:', e);
+                return null;
+            }
+        }
+
+        async function retrainModel(options = { silent: false }) {
+            if (isTraining) return;
+            
+            // CRITICAL FIX: Always rebuild from current db
+            const { classes, X, Y } = buildTrainingSet();
+
+            if (classes.length < 2) {
+                if (!options.silent) {
+                    document.getElementById('output').innerText =
+                        '⚠️ Need at least 2 different trained characters before a model can be built.';
+                }
+                updateRealOcrStatus();
+                return;
+            }
+
+            isTraining = true;
+            updateRealOcrStatus('⏳ Training neural network…');
+
+            const inputSize = INPUT_SIZE;
+            const numClasses = classes.length;
+            const hSize = hiddenSize;
+            const net = initNetworkCPU(inputSize, hSize, numClasses);
+
+            const N = X.length;
+            const epochs = Math.max(50, Math.min(500, Math.round(25000 / N)));
+            const lr = 0.08;
+
+            let epoch = 0;
+            const epochsPerChunk = 5;
+
+            function shuffledOrder() {
+                const idx = Array.from({ length: N }, (_, i) => i);
+                for (let i = idx.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [idx[i], idx[j]] = [idx[j], idx[i]];
+                }
+                return idx;
+            }
+
+            function runChunk() {
+                const chunkEnd = Math.min(epoch + epochsPerChunk, epochs);
+                for (; epoch < chunkEnd; epoch++) {
+                    const idx = shuffledOrder();
+                    for (const i of idx) {
+                        trainStepCPU(net, X[i], Y[i], lr);
+                    }
+                }
+                updateRealOcrStatus(`⏳ Training… epoch ${epoch}/${epochs}`);
+                if (epoch < epochs) {
+                    setTimeout(runChunk, 0);
+                } else {
+                    finishTraining();
+                }
+            }
+
+            async function finishTraining() {
+                // CRITICAL FIX: Store classes with the model
+                modelData = {
+                    classes: classes, // This MUST be the current classes array
+                    hiddenSize: hSize,
+                    inputSize: inputSize,
+                    numClasses: numClasses,
+                    W1: net.W1,
+                    b1: net.b1,
+                    W2: net.W2,
+                    b2: net.b2,
+                    trainedAt: new Date().toISOString(),
+                    sampleCount: N,
+                };
+
+                const gpuData = await uploadModelToGPU(net, classes);
+                if (gpuData) {
+                    modelData.gpuW1 = gpuData.gpuW1;
+                    modelData.gpuB1 = gpuData.gpuB1;
+                    modelData.gpuW2 = gpuData.gpuW2;
+                    modelData.gpuB2 = gpuData.gpuB2;
+                }
+
+                if (gpuAvailable && gpuDevice) {
+                    try {
+                        gpuComputePipeline = buildComputePipeline(gpuDevice, numClasses, hSize);
+                    } catch (e) {
+                        console.warn('Failed to build GPU pipeline:', e);
+                        gpuComputePipeline = null;
+                    }
+                }
+
+                persistModel();
+                isTraining = false;
+                updateRealOcrStatus();
+                if (!options.silent) {
+                    document.getElementById('output').innerText =
+                        `✅ Model trained on ${N} sample(s) across ${classes.length} character(s) with ${hSize} neurons.`;
+                }
+            }
+
+            runChunk();
+        }
+
+        function scheduleLiveRetrain() {
+            if (!realOcrMode) return;
+            if (retrainDebounceTimer) clearTimeout(retrainDebounceTimer);
+            retrainDebounceTimer = setTimeout(() => {
+                retrainModel({ silent: true });
+            }, 600);
+        }
+
+        // ============================================================
+        // 7. CLASSIFICATION WRAPPER - FIXED
+        // ============================================================
+        async function classifyVector(vector) {
+            if (premiumMode) return 'z';
+
+            if (realOcrMode && modelData && modelData.classes && modelData.classes.length > 0) {
+                if (gpuAvailable && gpuComputePipeline && modelData.gpuW1) {
+                    return await classifyWithGPU(vector);
+                } else {
+                    return cpuInference(vector, modelData);
+                }
+            }
+
+            // Fallback to nearest-neighbor
+            if (db.length === 0) return '?';
+            let bestMatch = '?';
+            let lowestDist = Infinity;
+            db.forEach(entry => {
+                let dist = 0;
+                for (let i = 0; i < vector.length; i++) {
+                    const diff = vector[i] - entry.vector[i];
+                    dist += diff * diff;
+                }
+                if (dist < lowestDist) {
+                    lowestDist = dist;
+                    bestMatch = entry.char;
+                }
+            });
+            return bestMatch;
+        }
+
+        // ============================================================
+        // 8. UI FUNCTIONS
+        // ============================================================
+        function updateStats() {
+            const label = storage.isAvailable ? 'Saved patterns' : 'Saved patterns (session only)';
+            document.getElementById('stats').innerText = `${label}: ${db.length}`;
+        }
+
+        function updateRealOcrStatus(overrideMsg) {
+            const el = document.getElementById('realOcrStatus');
+            if (!el) return;
+            if (overrideMsg) { el.textContent = overrideMsg; return; }
+            if (isTraining) { el.textContent = '⏳ Training…'; return; }
+            if (!modelData) {
+                el.textContent = realOcrMode
+                    ? '⚠️ No model yet — train at least 2 different characters, then tap "Retrain WebGPU Model".'
+                    : 'Off — using instant nearest-match detection.';
+                return;
+            }
+            const when = new Date(modelData.trainedAt).toLocaleString();
+            const gpuStatus = gpuAvailable ? 'WebGPU accelerated' : 'CPU fallback';
+            el.textContent = realOcrMode
+                ? `✅ Using trained model — ${modelData.classes.length} character(s), ${modelData.sampleCount} sample(s), ${gpuStatus}, trained ${when}.`
+                : `Model ready (${modelData.classes.length} character(s)) but Real OCR is off.`;
+        }
+
+        function togglePremium() {
+            const toggle = document.getElementById('premiumToggle');
+            premiumMode = !!(toggle && toggle.checked);
+            storage.set('ocr_premium', premiumMode ? 'true' : 'false');
+            updatePremiumStatus();
+        }
+
+        function updatePremiumStatus() {
+            const el = document.getElementById('premiumStatus');
+            if (!el) return;
+            el.textContent = premiumMode
+                ? '✅ OCR Premium active — every character now confidently detected as \'z\'.'
+                : 'Enable OCR Premium for a dramatically simplified detection experience.';
+        }
+
+        function toggleRealOcr() {
+            const toggle = document.getElementById('realOcrToggle');
+            realOcrMode = !!(toggle && toggle.checked);
+            storage.set('real_ocr_mode', realOcrMode ? 'true' : 'false');
+            if (realOcrMode && !modelData && !isTraining) {
+                retrainModel({ silent: true });
+            } else {
+                updateRealOcrStatus();
+            }
+        }
+
+        function setModelSize(size) {
+            hiddenSize = size;
+            persistHiddenSize();
+            document.querySelectorAll('.model-selector button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.size) === size);
+            });
+            document.getElementById('modelSizeStatus').textContent = `Current: ${size} neurons`;
+            if (realOcrMode && db.length > 0) {
+                const classes = [...new Set(db.map(e => e.char))];
+                if (classes.length >= 2) {
+                    retrainModel({ silent: false });
+                }
+            }
+        }
+
+        // ============================================================
+        // 9. CANVAS SETUP
+        // ============================================================
+        function setupCanvasListeners(id, tapCallback) {
+            const canvas = document.getElementById(id);
+            const ctx = canvas.getContext('2d');
+            ctx.lineWidth = (id === 'canvasDoc') ? 4 : 14;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#ffffff';
+
+            let isDrawing = false;
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches ? e.touches[0] : e;
+                return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+            }
+
+            canvas.addEventListener('touchstart', (e) => {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                if (tapCallback) tapCallback(pos.x);
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+            canvas.addEventListener('mousedown', (e) => {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                if (tapCallback) tapCallback(pos.x);
+            });
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            });
+            window.addEventListener('mouseup', () => { isDrawing = false; });
+        }
+
+        function clearCanvas(id) {
+            const cvs = document.getElementById(id);
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            document.getElementById('output').innerText = '';
+        }
+
+        // ============================================================
+        // 10. TAB 1: SINGLE TRAINER
+        // ============================================================
+        function saveSingle() {
+            const char = document.getElementById('charInput').value.trim();
+            if (!char) {
+                document.getElementById('output').innerText = '⚠️ Type target character!';
+                return;
+            }
+            const cvs = document.getElementById('canvasSingle');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+
+            db.push({ char: char, vector: vec });
+            persistDb();
+            scheduleLiveRetrain();
+
+            document.getElementById('output').innerText = `Saved '${char}'!`;
+            document.getElementById('charInput').value = '';
+            clearCanvas('canvasSingle');
+            updateStats();
+        }
+
+        async function recognizeSingle() {
+            const cvs = document.getElementById('canvasSingle');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+            const match = await classifyVector(vec);
+            document.getElementById('output').innerText = `Result: ${match}`;
+        }
+
+        // ============================================================
+        // 11. TAB 2: GUIDED TRAINER
+        // ============================================================
+        const FULL_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789äöüÄÖÜß".split('');
+
+        function initGuidedStep() {
+            if (guidedIndex >= FULL_SET.length) guidedIndex = 0;
+            document.getElementById('guidedTarget').innerText = FULL_SET[guidedIndex];
+            document.getElementById('guidedStatus').innerText = "Draw character, then tap 'Verify & Next'";
+            clearCanvas('canvasGuided');
+        }
+
+        async function processGuidedStep() {
+            const targetChar = FULL_SET[guidedIndex];
+            const cvs = document.getElementById('canvasGuided');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+
+            const detected = await classifyVector(vec);
+
+            if (detected === targetChar) {
+                document.getElementById('output').innerText = `✅ Detected '${detected}' correctly! Next...`;
+                guidedIndex++;
+                setTimeout(initGuidedStep, 600);
+            } else {
+                db.push({ char: targetChar, vector: vec });
+                persistDb();
+                scheduleLiveRetrain();
+                updateStats();
+
+                document.getElementById('output').innerText = `❌ Detected '${detected}'. Saved pattern for '${targetChar}'. Draw again!`;
+                clearCanvas('canvasGuided');
+            }
+        }
+
+        // ============================================================
+        // 12. TAB 3: FULL DOCUMENT OCR
+        // ============================================================
+        function loadDocImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                docImg = new Image();
+                docImg.onload = () => drawDocToCanvas();
+                docImg.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function drawDocToCanvas() {
+            const cvs = document.getElementById('canvasDoc');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            if (docImg) {
+                ctx.drawImage(docImg, 0, 0, cvs.width, cvs.height);
+                preprocessDocImage(cvs);
+            }
+            ctx.strokeStyle = '#ff453a';
+            ctx.lineWidth = 2;
+            manualBarriers.forEach(x => {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, cvs.height);
+                ctx.stroke();
+            });
+        }
+
+        function preprocessDocImage(cvs) {
+            const ctx = cvs.getContext('2d');
+            const w = cvs.width, h = cvs.height;
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+            const pixelCount = data.length / 4;
+
+            let minLum = 255, maxLum = 0;
+            const lums = new Float32Array(pixelCount);
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                lums[p] = lum;
+                if (lum < minLum) minLum = lum;
+                if (lum > maxLum) maxLum = lum;
+            }
+            const threshold = (minLum + maxLum) / 2;
+
+            let darkCount = 0;
+            for (let p = 0; p < pixelCount; p++) {
+                if (lums[p] < threshold) darkCount++;
+            }
+            const lightCount = pixelCount - darkCount;
+            const inkIsDark = darkCount <= lightCount;
+
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                const isDark = lums[p] < threshold;
+                const isInk = inkIsDark ? isDark : !isDark;
+                data[i] = 255;
+                data[i + 1] = 255;
+                data[i + 2] = 255;
+                data[i + 3] = isInk ? 255 : 0;
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function handleDocTap(xPos) {
+            if (!docImg) return;
+            manualBarriers.push(xPos);
+            manualBarriers.sort((a, b) => a - b);
+            drawDocToCanvas();
+        }
+
+        function clearDoc() {
+            manualBarriers = [];
+            drawDocToCanvas();
+            document.getElementById('output').innerText = '';
+        }
+
+        async function runDocOCR() {
+            const cvs = document.getElementById('canvasDoc');
+            const ctx = cvs.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
+            const w = cvs.width;
+            const h = cvs.height;
+            const data = imgData.data;
+
+            const visited = new Uint8Array(w * h);
+            let components = [];
+
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    if (data[idx * 4 + 3] > 40 && !visited[idx]) {
+                        if (manualBarriers.some(bx => Math.abs(bx - x) < 2)) continue;
+
+                        let minX = x, maxX = x, minY = y, maxY = y;
+                        let queue = [x, y];
+                        visited[idx] = 1;
+
+                        let head = 0;
+                        while (head < queue.length) {
+                            const cx = queue[head++];
+                            const cy = queue[head++];
+
+                            if (cx < minX) minX = cx;
+                            if (cx > maxX) maxX = cx;
+                            if (cy < minY) minY = cy;
+                            if (cy > maxY) maxY = cy;
+
+                            const neighbors = [
+                                [cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]
+                            ];
+
+                            for (let n = 0; n < neighbors.length; n++) {
+                                const nx = neighbors[n][0];
+                                const ny = neighbors[n][1];
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                                    const nIdx = ny * w + nx;
+                                    const isBarrier = manualBarriers.some(bx => Math.abs(bx - nx) < 2);
+                                    if (!visited[nIdx] && data[nIdx * 4 + 3] > 40 && !isBarrier) {
+                                        visited[nIdx] = 1;
+                                        queue.push(nx, ny);
+                                    }
+                                }
+                            }
+                        }
+
+                        if ((maxX - minX) > 1 || (maxY - minY) > 1) {
+                            components.push({ minX, maxX, minY, maxY });
+                        }
+                    }
+                }
+            }
+
+            function barrierBetween(a, b) {
+                const spanMin = Math.min(a.minX, b.minX);
+                const spanMax = Math.max(a.maxX, b.maxX);
+                return manualBarriers.some(bx => bx > spanMin && bx < spanMax);
+            }
+
+            function isDotAbove(dot, stem) {
+                const dotHeight = dot.maxY - dot.minY;
+                const dotWidth = dot.maxX - dot.minX;
+                const stemHeight = stem.maxY - stem.minY;
+                const isSmall = dotHeight < stemHeight * 0.5 && dotWidth < stemHeight * 0.6;
+                const sitsAbove = dot.maxY <= stem.minY + 12;
+                const xOverlap = !(dot.maxX < stem.minX - 4 || dot.minX > stem.maxX + 4);
+                return isSmall && sitsAbove && xOverlap;
+            }
+
+            let mergedBoxes = [];
+            const byHeightDesc = [...components].sort((a, b) => (b.maxY - b.minY) - (a.maxY - a.minY));
+            byHeightDesc.forEach(comp => {
+                let merged = false;
+                for (let m = 0; m < mergedBoxes.length; m++) {
+                    let target = mergedBoxes[m];
+                    if (barrierBetween(comp, target)) continue;
+                    if (isDotAbove(comp, target) || isDotAbove(target, comp)) {
+                        target.minX = Math.min(target.minX, comp.minX);
+                        target.maxX = Math.max(target.maxX, comp.maxX);
+                        target.minY = Math.min(target.minY, comp.minY);
+                        target.maxY = Math.max(target.maxY, comp.maxY);
+                        merged = true;
+                        break;
+                    }
+                }
+                if (!merged) {
+                    mergedBoxes.push({ ...comp });
+                }
+            });
+
+            mergedBoxes.sort((a, b) => a.minX - b.minX);
+
+            let textOutput = "";
+            for (const box of mergedBoxes) {
+                const vec = extractVectorFromBoundingBox(cvs, box);
+                textOutput += await classifyVector(vec);
+            }
+
+            document.getElementById('output').innerText = `Parsed File: ${textOutput || 'No text detected'}`;
+        }
+
+        // ============================================================
+        // 13. TAB 4: MATRIX
+        // ============================================================
+        let selectedChar = null;
+
+        function buildMatrix() {
+            const grid = document.getElementById('gridContainer');
+            grid.innerHTML = '';
+
+            FULL_SET.forEach(char => {
+                const count = db.filter(e => e.char === char).length;
+                const cell = document.createElement('div');
+                cell.className = `grid-cell ${count > 0 ? 'trained' : 'un-trained'}`;
+                cell.innerText = `${char} (${count})`;
+                if (count > 0) {
+                    cell.style.cursor = 'pointer';
+                    cell.onclick = () => openCharacterSamples(char);
+                }
+                grid.appendChild(cell);
+            });
+
+            if (selectedChar) renderCharacterSamples();
+        }
+
+        function openCharacterSamples(char) {
+            selectedChar = char;
+            renderCharacterSamples();
+        }
+
+        function closeSampleViewer() {
+            selectedChar = null;
+            const panel = document.getElementById('sampleViewer');
+            if (panel) panel.style.display = 'none';
+        }
+
+        function renderCharacterSamples() {
+            const panel = document.getElementById('sampleViewer');
+            const grid = document.getElementById('sampleGrid');
+            const title = document.getElementById('sampleViewerTitle');
+            if (!panel || !grid || !title || !selectedChar) return;
+
+            const entries = db
+                .map((entry, index) => ({ entry, index }))
+                .filter(o => o.entry.char === selectedChar);
+
+            if (entries.length === 0) {
+                closeSampleViewer();
+                return;
+            }
+
+            panel.style.display = 'block';
+            title.textContent = `'${selectedChar}' — ${entries.length} sample(s)`;
+            grid.innerHTML = '';
+
+            entries.forEach(({ entry, index }) => {
+                const tile = document.createElement('div');
+                tile.className = 'sample-tile';
+
+                const img = document.createElement('img');
+                img.src = vectorToPngDataURL(entry.vector);
+                tile.appendChild(img);
+
+                const del = document.createElement('button');
+                del.className = 'sample-delete-btn';
+                del.innerText = '✕';
+                del.onclick = (ev) => {
+                    ev.stopPropagation();
+                    deleteSample(index);
+                };
+                tile.appendChild(del);
+
+                grid.appendChild(tile);
+            });
+        }
+
+        function deleteSample(index) {
+            const removedChar = db[index] ? db[index].char : selectedChar;
+            db.splice(index, 1);
+            persistDb();
+            // Force model retrain to sync classes
+            if (realOcrMode) {
+                modelData = null; // Invalidate old model
+                scheduleLiveRetrain();
+            }
+            updateStats();
+            buildMatrix();
+            renderCharacterSamples();
+            document.getElementById('output').innerText = `Deleted 1 sample of '${removedChar}'. Model will retrain.`;
+        }
+
+        function deleteAllForSelectedChar() {
+            if (!selectedChar) return;
+            if (!confirm(`Delete all saved samples of '${selectedChar}'?`)) return;
+            db = db.filter(e => e.char !== selectedChar);
+            persistDb();
+            if (realOcrMode) {
+                modelData = null; // Invalidate old model
+                scheduleLiveRetrain();
+            }
+            updateStats();
+            const deletedChar = selectedChar;
+            closeSampleViewer();
+            buildMatrix();
+            document.getElementById('output').innerText = `Deleted all samples of '${deletedChar}'. Model will retrain.`;
+        }
+
+        function clearDB() {
+            if (confirm("Reset entire custom OCR training database?")) {
+                db = [];
+                modelData = null;
+                try {
+                    storage.remove('custom_ocr_db');
+                    storage.remove('custom_ocr_model');
+                } catch (e) {}
+                closeSampleViewer();
+                updateStats();
+                buildMatrix();
+                updateRealOcrStatus();
+                document.getElementById('output').innerText = 'DB Wiped!';
+            }
+        }
+
+        // ============================================================
+        // 14. TAB 5: HANDWRITING RENDERER
+        // ============================================================
+        function vectorToPngDataURL(vector) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+            const imgData = tCtx.createImageData(28, 28);
+            for (let i = 0; i < vector.length; i++) {
+                imgData.data[i * 4] = 255;
+                imgData.data[i * 4 + 1] = 255;
+                imgData.data[i * 4 + 2] = 255;
+                imgData.data[i * 4 + 3] = Math.round(vector[i] * 255);
+            }
+            tCtx.putImageData(imgData, 0, 0);
+            return temp.toDataURL('image/png');
+        }
+
+        function drawVectorAt(ctx, vector, x, y, size) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+            const imgData = tCtx.createImageData(28, 28);
+            for (let i = 0; i < vector.length; i++) {
+                const alpha = Math.round(vector[i] * 255);
+                imgData.data[i * 4] = 255;
+                imgData.data[i * 4 + 1] = 255;
+                imgData.data[i * 4 + 2] = 255;
+                imgData.data[i * 4 + 3] = alpha;
+            }
+            tCtx.putImageData(imgData, 0, 0);
+
+            const jitterAngle = (Math.random() - 0.5) * 0.15;
+            const jitterY = (Math.random() - 0.5) * 6;
+
+            ctx.save();
+            ctx.translate(x + size / 2, y + size / 2 + jitterY);
+            ctx.rotate(jitterAngle);
+            ctx.drawImage(temp, -size / 2, -size / 2, size, size);
+            ctx.restore();
+        }
+
+        function clearHandwriteCanvas() {
+            const cvs = document.getElementById('canvasHandwrite');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            document.getElementById('output').innerText = '';
+        }
+
+        function renderHandwriting() {
+            const text = document.getElementById('typeInput').value;
+            const cvs = document.getElementById('canvasHandwrite');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+            if (!text) {
+                document.getElementById('output').innerText = '⚠️ Type something first!';
+                return;
+            }
+
+            const charSize = 32;
+            const lineHeight = 40;
+            const marginX = 10;
+            let cursorX = marginX;
+            let cursorY = 10;
+            let untrainedSeen = new Set();
+            let renderedCount = 0;
+
+            for (const ch of text) {
+                if (ch === '\n') {
+                    cursorX = marginX;
+                    cursorY += lineHeight;
+                    continue;
+                }
+                if (ch === ' ') {
+                    cursorX += charSize * 0.6;
+                    continue;
+                }
+                if (cursorX > cvs.width - charSize - marginX) {
+                    cursorX = marginX;
+                    cursorY += lineHeight;
+                }
+                if (cursorY > cvs.height - lineHeight) break;
+
+                const lookupChar = premiumMode ? 'z' : ch;
+                const matches = db.filter(e => e.char === lookupChar);
+
+                if (matches.length === 0) {
+                    untrainedSeen.add(lookupChar);
+                    ctx.save();
+                    ctx.strokeStyle = '#ff9f0a';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 3]);
+                    ctx.strokeRect(cursorX, cursorY, charSize * 0.7, charSize);
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#ff9f0a';
+                    ctx.font = '12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('?', cursorX + charSize * 0.35, cursorY + charSize / 2 + 4);
+                    ctx.restore();
+                    cursorX += charSize * 0.85;
+                    continue;
+                }
+
+                const pick = matches[Math.floor(Math.random() * matches.length)];
+                drawVectorAt(ctx, pick.vector, cursorX, cursorY, charSize);
+                cursorX += charSize * 0.82;
+                renderedCount++;
+            }
+
+            let statusMsg = premiumMode
+                ? `✅ OCR Premium: rendered ${renderedCount} character(s) as 'z'.`
+                : `✅ Rendered ${renderedCount} character(s).`;
+            if (untrainedSeen.size > 0) {
+                statusMsg += ` Missing training for: ${[...untrainedSeen].join(' ')}`;
+            }
+            document.getElementById('output').innerText = statusMsg;
+        }
+
+        // ============================================================
+        // 15. TAB 6: SETTINGS
+        // ============================================================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.getElementById(`btn-tab-${tabId}`).classList.add('active');
+            document.getElementById('output').innerText = '';
+            if (tabId === 'guided') initGuidedStep();
+            if (tabId === 'table') buildMatrix();
+            if (tabId === 'settings') {
+                document.getElementById('premiumToggle').checked = premiumMode;
+                updatePremiumStatus();
+                document.getElementById('realOcrToggle').checked = realOcrMode;
+                updateRealOcrStatus();
+                document.querySelectorAll('.model-selector button').forEach(b => {
+                    b.classList.toggle('active', parseInt(b.dataset.size) === hiddenSize);
+                });
+                document.getElementById('modelSizeStatus').textContent = `Current: ${hiddenSize} neurons`;
+            }
+        }
+
+        // ============================================================
+        // 16. ZOODLE EXPORT/IMPORT
+        // ============================================================
+        const ZOODLE_MAGIC = 'ZOODLE1';
+
+        function pngDataURLToVector(dataURL) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const temp = document.createElement('canvas');
+                    temp.width = 28; temp.height = 28;
+                    const tCtx = temp.getContext('2d');
+                    tCtx.drawImage(img, 0, 0, 28, 28);
+                    const data = tCtx.getImageData(0, 0, 28, 28).data;
+                    const vector = [];
+                    for (let i = 0; i < data.length; i += 4) {
+                        vector.push(data[i + 3] / 255.0);
+                    }
+                    resolve(vector);
+                };
+                img.onerror = reject;
+                img.src = dataURL;
+            });
+        }
+
+        function exportTrainedData() {
+            if (db.length === 0) {
+                document.getElementById('output').innerText = '⚠️ Nothing trained yet — nothing to export!';
+                return;
+            }
+
+            let out = [];
+            out.push(ZOODLE_MAGIC);
+            out.push('# .zoodle file — a Zoo of Doodles.');
+            out.push('# Exported from WebGPU Neural OCR Pro on ' + new Date().toISOString());
+            out.push(`COUNT=${db.length}`);
+
+            db.forEach(entry => {
+                const dataURL = vectorToPngDataURL(entry.vector);
+                const base64 = dataURL.split(',')[1];
+                out.push(`>>>${entry.char}`);
+                out.push(base64);
+                out.push('<<<');
+            });
+
+            const blob = new Blob([out.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ocr-training-data-${Date.now()}.zoodle`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            document.getElementById('output').innerText = `✅ Exported ${db.length} samples as .zoodle`;
+        }
+
+        async function importTrainedData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const text = event.target.result;
+                    const lines = text.split('\n');
+
+                    if (lines[0].trim() !== ZOODLE_MAGIC) {
+                        document.getElementById('output').innerText =
+                            "⚠️ That doesn't look like a .zoodle file (missing header). Import aborted.";
+                        return;
+                    }
+
+                    const entries = [];
+                    let i = 0;
+                    while (i < lines.length) {
+                        const line = lines[i];
+                        if (line.startsWith('>>>')) {
+                            const char = line.slice(3);
+                            const base64Lines = [];
+                            i++;
+                            while (i < lines.length && lines[i].trim() !== '<<<') {
+                                base64Lines.push(lines[i]);
+                                i++;
+                            }
+                            entries.push({ char, base64: base64Lines.join('') });
+                        }
+                        i++;
+                    }
+
+                    if (entries.length === 0) {
+                        document.getElementById('output').innerText =
+                            '⚠️ No character entries found in that file.';
+                        return;
+                    }
+
+                    const decoded = await Promise.all(
+                        entries.map(async (entry) => {
+                            const vector = await pngDataURLToVector('data:image/png;base64,' + entry.base64);
+                            return { char: entry.char, vector };
+                        })
+                    );
+
+                    decoded.forEach(d => db.push(d));
+                    persistDb();
+                    scheduleLiveRetrain();
+                    updateStats();
+                    buildMatrix();
+
+                    document.getElementById('output').innerText =
+                        `✅ Imported ${decoded.length} samples from .zoodle (added to existing ${db.length - decoded.length}).`;
+                } catch (err) {
+                    console.error('Zoodle import failed:', err);
+                    document.getElementById('output').innerText =
+                        '❌ Failed to import — file may be corrupted or not a valid .zoodle.';
+                } finally {
+                    e.target.value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ============================================================
+        // 17. INIT
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                await initWebGPU();
+
+                // Load model from storage
+                try {
+                    const saved = storage.get('custom_ocr_model');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && parsed.classes && parsed.classes.length > 0) {
+                            modelData = parsed;
+                            if (gpuAvailable && gpuDevice) {
+                                const net = {
+                                    W1: modelData.W1,
+                                    b1: modelData.b1,
+                                    W2: modelData.W2,
+                                    b2: modelData.b2,
+                                    hiddenSize: modelData.hiddenSize,
+                                    inputSize: modelData.inputSize,
+                                    numClasses: modelData.numClasses,
+                                };
+                                const gpuData = await uploadModelToGPU(net, modelData.classes);
+                                if (gpuData) {
+                                    modelData.gpuW1 = gpuData.gpuW1;
+                                    modelData.gpuB1 = gpuData.gpuB1;
+                                    modelData.gpuW2 = gpuData.gpuW2;
+                                    modelData.gpuB2 = gpuData.gpuB2;
+                                    gpuComputePipeline = buildComputePipeline(gpuDevice, modelData.numClasses, modelData.hiddenSize);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { console.warn('Failed to load model:', e); }
+
+                // Load hidden size
+                try {
+                    const savedSize = storage.get('model_hidden_size');
+                    if (savedSize) {
+                        hiddenSize = parseInt(savedSize);
+                        if (![16, 32, 64, 128, 256, 512, 1024].includes(hiddenSize)) hiddenSize = 256;
+                    }
+                } catch (e) {}
+
+                if (!storage.isAvailable) {
+                    const banner = document.getElementById('warnBanner');
+                    if (banner) banner.style.display = 'block';
+                }
+
+                document.getElementById('premiumToggle').checked = premiumMode;
+                document.getElementById('realOcrToggle').checked = realOcrMode;
+                document.querySelectorAll('.model-selector button').forEach(b => {
+                    b.classList.toggle('active', parseInt(b.dataset.size) === hiddenSize);
+                });
+                document.getElementById('modelSizeStatus').textContent = `Current: ${hiddenSize} neurons`;
+
+                setupCanvasListeners('canvasSingle');
+                setupCanvasListeners('canvasGuided');
+                setupCanvasListeners('canvasDoc', handleDocTap);
+
+                updateStats();
+                buildMatrix();
+                updatePremiumStatus();
+                updateRealOcrStatus();
+
+                if (realOcrMode && db.length > 0) {
+                    const classes = [...new Set(db.map(e => e.char))];
+                    if (classes.length >= 2 && !modelData) {
+                        retrainModel({ silent: true });
+                    }
+                }
+
+            } catch (e) {
+                console.error('Init error:', e);
+            }
+        });
+    </script>
+</body>
+</html>
