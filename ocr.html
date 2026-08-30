@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Handwriting OCR Suite</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #121212;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            margin: 0;
+            user-select: none;
+        }
+        h2, h3 { margin: 5px 0 10px 0; font-size: 18px; text-align: center; }
+        .nav {
+            display: flex;
+            gap: 5px;
+            width: 100%;
+            max-width: 360px;
+            margin-bottom: 10px;
+        }
+        .nav button {
+            flex: 1;
+            padding: 10px 4px;
+            font-size: 11px;
+            background: #2c2c2e;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .nav button.active { background: #0a84ff; }
+        .tab { display: none; width: 100%; max-width: 360px; flex-direction: column; align-items: center; }
+        .tab.active { display: flex; }
+
+        canvas {
+            border: 2px solid #333;
+            background: #000;
+            border-radius: 12px;
+            touch-action: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .controls { display: flex; gap: 8px; margin-top: 10px; width: 100%; }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            background: #2c2c2e;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.7; }
+        .save-btn { background: #0a84ff; }
+        .clear-btn { background: #ff453a; }
+        .action-btn { background: #30d158; color: #000; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1c1c1e;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        #output { margin-top: 10px; font-size: 16px; font-weight: bold; color: #30d158; text-align: center; word-break: break-all; }
+        #stats { margin-top: 6px; font-size: 12px; color: #8e8e93; text-align: center; }
+        #warnBanner {
+            display: none;
+            width: 100%;
+            max-width: 360px;
+            background: #3a2a00;
+            border: 1px solid #ffcc00;
+            color: #ffcc00;
+            font-size: 11px;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* Training Grid Table */
+        .alphabet-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 5px;
+            background: #1c1c1e;
+            border-radius: 8px;
+        }
+        .grid-cell {
+            padding: 8px 0;
+            background: #2c2c2e;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .grid-cell.trained { border: 1px solid #30d158; color: #30d158; }
+        .grid-cell.un-trained { opacity: 0.4; }
+
+        #sampleViewer {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+            background: #1c1c1e;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .sample-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            margin: 10px 0;
+            padding: 4px;
+            background: #000;
+            border-radius: 6px;
+        }
+        .sample-tile {
+            position: relative;
+            width: 52px;
+            height: 52px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+            flex: none;
+        }
+        .sample-tile img { width: 100%; height: 100%; object-fit: contain; }
+        .sample-delete-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 18px;
+            height: 18px;
+            line-height: 16px;
+            background: #ff453a;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 0;
+            flex: none;
+        }
+
+        /* Auto Training Prompt Banner */
+        .prompt-card {
+            background: #1c1c1e;
+            border: 1px solid #0a84ff;
+            border-radius: 8px;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .prompt-card h4 { margin: 0; color: #8e8e93; font-size: 12px; }
+        .prompt-card .target { font-size: 28px; font-weight: bold; color: #0a84ff; margin: 4px 0; }
+
+        input[type="file"] { display: none; }
+        .file-upload-label {
+            width: 100%;
+            padding: 12px;
+            background: #2c2c2e;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
+            border: 1px dashed #0a84ff;
+        }
+
+        /* Toggle switch */
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #3a3a3c; transition: .2s; border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background-color: white; transition: .2s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #30d158; }
+        input:checked + .slider:before { transform: translateX(20px); }
+    </style>
+</head>
+<body>
+
+    <h2>Custom OCR Suite</h2>
+    <div id="warnBanner">⚠️ Local storage isn't available here (private mode / file:// / blocked). Your trained patterns will only be kept for this session and won't be saved after you close the page.</div>
+
+    <div class="nav">
+        <button id="btn-tab-single" class="active" onclick="switchTab('single')">Single</button>
+        <button id="btn-tab-guided" onclick="switchTab('guided')">A-Z Trainer</button>
+        <button id="btn-tab-doc" onclick="switchTab('doc')">Full File</button>
+        <button id="btn-tab-table" onclick="switchTab('table')">Grid</button>
+    </div>
+    <div class="nav" style="margin-top: -4px;">
+        <button id="btn-tab-type" onclick="switchTab('type')">Type→Handwriting</button>
+        <button id="btn-tab-settings" onclick="switchTab('settings')">⚙️ Settings</button>
+    </div>
+
+    <!-- TAB 1: SINGLE CHARACTER TRAINER -->
+    <div id="tab-single" class="tab active">
+        <canvas id="canvasSingle" width="280" height="280"></canvas>
+        <input type="text" id="charInput" placeholder="Target letter (A, a, ä, ß...)" maxlength="2" autocomplete="off">
+        <div class="controls">
+            <button class="clear-btn" onclick="clearCanvas('canvasSingle')">Clear</button>
+            <button onclick="recognizeSingle()">Recognize</button>
+            <button class="save-btn" onclick="saveSingle()">Save</button>
+        </div>
+    </div>
+
+    <!-- TAB 2: GUIDED AUTOMATIC TRAINER -->
+    <div id="tab-guided" class="tab">
+        <div class="prompt-card">
+            <h4>DRAW THIS CHARACTER BELOW:</h4>
+            <div class="target" id="guidedTarget">A</div>
+            <div id="guidedStatus" style="font-size:12px; color:#aaa;">Draw, then tap 'Verify & Next'</div>
+        </div>
+        <canvas id="canvasGuided" width="280" height="240"></canvas>
+        <div class="controls">
+            <button class="clear-btn" onclick="clearCanvas('canvasGuided')">Clear</button>
+            <button class="action-btn" onclick="processGuidedStep()">Verify & Next</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: FULL FILE OCR WITH CONNECTED COMPONENT SEGMENTATION -->
+    <div id="tab-doc" class="tab">
+        <canvas id="canvasDoc" width="340" height="220"></canvas>
+        <label class="file-upload-label" for="docLoader">📁 Upload Document Image</label>
+        <input type="file" id="docLoader" accept="image/*" onchange="loadDocImage(event)">
+        <div class="controls">
+            <button class="clear-btn" onclick="clearDoc()">Clear Barriers</button>
+            <button class="action-btn" onclick="runDocOCR()">Scan Text</button>
+        </div>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Connected-component extraction merges dots/umlauts above letters automatically.
+            <b>Tap canvas</b> to draw vertical split barriers for touching characters.
+        </p>
+    </div>
+
+    <!-- TAB 4: TRAINING MATRIX / COVERAGE TABLE -->
+    <div id="tab-table" class="tab">
+        <h3>Character Training Matrix</h3>
+        <p style="font-size: 11px; color: #8e8e93; margin: -6px 0 0 0; text-align: center;">
+            Tap a trained character to view and delete individual samples.
+        </p>
+        <div id="gridContainer" class="alphabet-grid"></div>
+
+        <div id="sampleViewer">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4 id="sampleViewerTitle" style="margin:0; font-size:14px;"></h4>
+                <button style="flex:none; padding:6px 10px; font-size:12px;" onclick="closeSampleViewer()">✕ Close</button>
+            </div>
+            <div id="sampleGrid" class="sample-grid"></div>
+            <button class="clear-btn" style="width:100%;" onclick="deleteAllForSelectedChar()">🗑️ Delete All for This Character</button>
+        </div>
+
+        <button style="background: #ff453a; margin-top: 15px; width: 100%;" onclick="clearDB()">Reset DB</button>
+    </div>
+
+    <!-- TAB 5: TEXT -> HANDWRITING RENDERER -->
+    <div id="tab-type" class="tab">
+        <h3>Type it, see it "handwritten"</h3>
+        <input type="text" id="typeInput" placeholder="Type something..." autocomplete="off" style="margin-top:0;">
+        <div class="controls">
+            <button class="action-btn" onclick="renderHandwriting()">Handwrite It</button>
+            <button class="clear-btn" onclick="clearHandwriteCanvas()">Clear</button>
+        </div>
+        <canvas id="canvasHandwrite" width="340" height="220" style="margin-top:10px;"></canvas>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Pulls a random saved sample for each letter from your trained database and stitches them together.
+            Untrained characters show as a dashed gap.
+        </p>
+    </div>
+
+    <!-- TAB 6: SETTINGS -->
+    <div id="tab-settings" class="tab">
+        <h3>Settings</h3>
+        <div class="prompt-card" style="text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">OCR Premium ✨</div>
+                    <div style="font-size:11px; color:#8e8e93; max-width:230px;">
+                        Unlocks enhanced detection accuracy powered by our proprietary Z-Vision™ engine.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="premiumToggle" onchange="togglePremium()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <p id="premiumStatus" style="font-size: 12px; color: #8e8e93; text-align: center;"></p>
+
+        <h3 style="margin-top:20px;">Real OCR (Trained Model)</h3>
+        <div class="prompt-card" style="text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">Real OCR 🧠</div>
+                    <div style="font-size:11px; color:#8e8e93; max-width:230px;">
+                        Trains a small neural network on your saved samples instead of
+                        nearest-match lookup. Retrains automatically as you add samples.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="realOcrToggle" onchange="toggleRealOcr()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <p id="realOcrStatus" style="font-size: 12px; color: #8e8e93; text-align: center;"></p>
+        <button class="action-btn" style="width:100%; margin-top:6px;" onclick="retrainModel()">🔄 Retrain Model from Scratch</button>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 6px; text-align: center;">
+            Needs at least 2 different trained characters. Retraining replaces the
+            current model using every sample currently in your database.
+        </p>
+
+        <h3 style="margin-top:20px;">Backup & Transfer</h3>
+        <div class="controls">
+            <button class="action-btn" onclick="exportTrainedData()">Export .zoodle</button>
+            <label class="file-upload-label" for="zoodleLoader" style="flex:1; margin-top:0; display:flex; align-items:center; justify-content:center;">📥 Import .zoodle</label>
+            <input type="file" id="zoodleLoader" accept=".zoodle,text/plain" onchange="importTrainedData(event)">
+        </div>
+        <p style="font-size: 11px; color: #8e8e93; margin-top: 8px; text-align: center;">
+            Exports your trained samples as a <b>.zoodle</b> file — our own lightweight
+            format that stores each character as a real embedded PNG doodle next to its
+            text label, so it's both compact and human-readable (open it in any text
+            editor and you'll see labeled base64 image blocks, not a wall of raw coordinates).
+        </p>
+    </div>
+
+    <div id="output"></div>
+    <div id="stats">Saved patterns: 0</div>
+
+    <script>
+        const FULL_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789äöüÄÖÜß".split('');
+
+        // --- SAFE STORAGE LAYER ---
+        // Wraps localStorage so a SecurityError (private browsing, file://, blocked
+        // storage in Safari/Brave, sandboxed iframe, etc.) never kills the whole script.
+        // Falls back to an in-memory store for the session if storage is unavailable.
+        const storage = (function () {
+            let available = false;
+            try {
+                const testKey = '__storage_test__';
+                window.localStorage.setItem(testKey, '1');
+                window.localStorage.removeItem(testKey);
+                available = true;
+            } catch (e) {
+                available = false;
+            }
+
+            let memoryFallback = null;
+
+            return {
+                isAvailable: available,
+                get(key) {
+                    if (available) {
+                        try { return window.localStorage.getItem(key); }
+                        catch (e) { /* fall through to memory */ }
+                    }
+                    return memoryFallback;
+                },
+                set(key, value) {
+                    if (available) {
+                        try { window.localStorage.setItem(key, value); return; }
+                        catch (e) { /* fall through to memory */ }
+                    }
+                    memoryFallback = value;
+                },
+                remove(key) {
+                    if (available) {
+                        try { window.localStorage.removeItem(key); }
+                        catch (e) { /* ignore */ }
+                    }
+                    memoryFallback = null;
+                }
+            };
+        })();
+
+        let db = [];
+        try {
+            db = JSON.parse(storage.get('custom_ocr_db') || '[]');
+        } catch (e) {
+            console.warn('Could not parse saved OCR database, starting fresh.', e);
+            db = [];
+        }
+
+        // OCR Premium™ — a purely cosmetic toggle that, when enabled, deliberately
+        // brings back the "everything is z" bug on purpose, for entertainment.
+        let premiumMode = storage.get('ocr_premium') === 'true';
+
+        // --- REAL OCR: a tiny from-scratch neural network trained on your samples ---
+        let realOcrMode = storage.get('real_ocr_mode') === 'true';
+        let model = null;
+        try {
+            model = JSON.parse(storage.get('custom_ocr_model') || 'null');
+        } catch (e) {
+            console.warn('Could not parse saved OCR model, starting without one.', e);
+            model = null;
+        }
+        let isTraining = false;
+        let retrainDebounceTimer = null;
+
+        function persistDb() {
+            try {
+                storage.set('custom_ocr_db', JSON.stringify(db));
+            } catch (e) {
+                console.warn('Could not persist OCR database.', e);
+            }
+        }
+
+        let guidedIndex = 0;
+        let docImg = null;
+        let manualBarriers = [];
+
+        // Defer setup to DOMContentLoaded so we never run against missing elements,
+        // and wrap it all so one failure doesn't blank the whole page.
+        document.addEventListener('DOMContentLoaded', init);
+
+        function init() {
+            try {
+                if (!storage.isAvailable) {
+                    const banner = document.getElementById('warnBanner');
+                    if (banner) banner.style.display = 'block';
+                }
+                updateStats();
+                buildMatrix();
+                setupCanvasListeners('canvasSingle');
+                setupCanvasListeners('canvasGuided');
+                setupCanvasListeners('canvasDoc', handleDocTap);
+                const toggle = document.getElementById('premiumToggle');
+                if (toggle) toggle.checked = premiumMode;
+                updatePremiumStatus();
+                const realToggle = document.getElementById('realOcrToggle');
+                if (realToggle) realToggle.checked = realOcrMode;
+                updateRealOcrStatus();
+            } catch (e) {
+                console.error('Init error:', e);
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.getElementById(`btn-tab-${tabId}`).classList.add('active');
+            document.getElementById('output').innerText = '';
+            if (tabId === 'guided') initGuidedStep();
+            if (tabId === 'table') buildMatrix();
+            if (tabId === 'settings') {
+                const toggle = document.getElementById('premiumToggle');
+                if (toggle) toggle.checked = premiumMode;
+                updatePremiumStatus();
+                const realToggle = document.getElementById('realOcrToggle');
+                if (realToggle) realToggle.checked = realOcrMode;
+                updateRealOcrStatus();
+            }
+        }
+
+        function setupCanvasListeners(id, tapCallback) {
+            const canvas = document.getElementById(id);
+            const ctx = canvas.getContext('2d');
+            ctx.lineWidth = (id === 'canvasDoc') ? 4 : 14;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#ffffff';
+
+            let isDrawing = false;
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches ? e.touches[0] : e;
+                return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+            }
+
+            canvas.addEventListener('touchstart', (e) => {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                // Draw a dot immediately so a single tap (no drag) still leaves a mark
+                ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                if (tapCallback) tapCallback(pos.x);
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+            // Mouse support for desktop testing in Safari/Brave
+            canvas.addEventListener('mousedown', (e) => {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                if (tapCallback) tapCallback(pos.x);
+            });
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            });
+            window.addEventListener('mouseup', () => { isDrawing = false; });
+        }
+
+        function clearCanvas(id) {
+            const cvs = document.getElementById(id);
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            document.getElementById('output').innerText = '';
+        }
+
+        // --- EXTRACT TIGHT BOUNDING BOX VECTOR ---
+        // Fits the handwritten mark tightly inside a 28x28 matrix so aspect ratio stays intact
+        function extractVectorFromBoundingBox(sourceCanvas, box) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+
+            // Add padding around raw stroke box
+            const pad = 4;
+            const srcX = Math.max(0, box.minX - pad);
+            const srcY = Math.max(0, box.minY - pad);
+            const srcW = Math.min(sourceCanvas.width - srcX, (box.maxX - box.minX) + pad * 2);
+            const srcH = Math.min(sourceCanvas.height - srcY, (box.maxY - box.minY) + pad * 2);
+
+            tCtx.drawImage(sourceCanvas, srcX, srcY, srcW, srcH, 2, 2, 24, 24);
+            const imgData = tCtx.getImageData(0, 0, 28, 28).data;
+
+            const vector = [];
+            for (let i = 0; i < imgData.length; i += 4) {
+                vector.push(imgData[i + 3] / 255.0);
+            }
+            return vector;
+        }
+
+        // Helper to scan whole canvas tightly
+        function getCanvasBoundingBox(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+            let found = false;
+
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const idx = (y * canvas.width + x) * 4;
+                    if (imgData[idx + 3] > 30) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        found = true;
+                    }
+                }
+            }
+            if (!found) return { minX: 0, minY: 0, maxX: canvas.width, maxY: canvas.height };
+            return { minX, minY, maxX, maxY };
+        }
+
+        // --- CLASSIFIER: trained model (Real OCR) or nearest-neighbor fallback ---
+        function classifyVector(vector) {
+            // OCR Premium™: our proprietary Z-Vision™ engine has spoken. Overrides everything.
+            if (premiumMode) return 'z';
+
+            if (realOcrMode && model && model.classes && model.classes.length > 0) {
+                return predictWithModel(vector);
+            }
+
+            if (db.length === 0) return '?';
+            let bestMatch = '?';
+            let lowestDist = Infinity;
+
+            db.forEach(entry => {
+                let dist = 0;
+                for (let i = 0; i < vector.length; i++) {
+                    const diff = vector[i] - entry.vector[i];
+                    dist += diff * diff;
+                }
+                if (dist < lowestDist) {
+                    lowestDist = dist;
+                    bestMatch = entry.char;
+                }
+            });
+
+            return bestMatch;
+        }
+
+        function togglePremium() {
+            const toggle = document.getElementById('premiumToggle');
+            premiumMode = !!(toggle && toggle.checked);
+            storage.set('ocr_premium', premiumMode ? 'true' : 'false');
+            updatePremiumStatus();
+        }
+
+        function updatePremiumStatus() {
+            const el = document.getElementById('premiumStatus');
+            if (!el) return;
+            el.textContent = premiumMode
+                ? '✅ OCR Premium active — every character now confidently detected as \'z\'.'
+                : 'Enable OCR Premium for a dramatically simplified detection experience.';
+        }
+
+        // --- REAL OCR: tiny neural net (trained fresh from your samples) ---
+
+        function toggleRealOcr() {
+            const toggle = document.getElementById('realOcrToggle');
+            realOcrMode = !!(toggle && toggle.checked);
+            storage.set('real_ocr_mode', realOcrMode ? 'true' : 'false');
+            if (realOcrMode && !model && !isTraining) {
+                retrainModel();
+            } else {
+                updateRealOcrStatus();
+            }
+        }
+
+        function updateRealOcrStatus(overrideMsg) {
+            const el = document.getElementById('realOcrStatus');
+            if (!el) return;
+            if (overrideMsg) { el.textContent = overrideMsg; return; }
+            if (isTraining) { el.textContent = '⏳ Training…'; return; }
+            if (!model) {
+                el.textContent = realOcrMode
+                    ? '⚠️ No model yet — train at least 2 different characters, then tap "Retrain Model".'
+                    : 'Off — using instant nearest-match detection.';
+                return;
+            }
+            const when = new Date(model.trainedAt).toLocaleString();
+            el.textContent = realOcrMode
+                ? `✅ Using trained model — ${model.classes.length} character(s), ${model.sampleCount} sample(s), trained ${when}.`
+                : `Model ready (${model.classes.length} character(s)) but Real OCR is off.`;
+        }
+
+        function buildTrainingSet() {
+            const classes = [...new Set(db.map(e => e.char))].sort();
+            const classIndex = {};
+            classes.forEach((c, i) => { classIndex[c] = i; });
+            const X = db.map(e => e.vector);
+            const Y = db.map(e => classIndex[e.char]);
+            return { classes, classIndex, X, Y };
+        }
+
+        function initNetwork(inputSize, hiddenSize, numClasses) {
+            const randArr = (n, scale) => Array.from({ length: n }, () => (Math.random() * 2 - 1) * scale);
+            const scale1 = Math.sqrt(2 / inputSize);
+            const scale2 = Math.sqrt(2 / hiddenSize);
+            return {
+                inputSize, hiddenSize, numClasses,
+                W1: Array.from({ length: hiddenSize }, () => randArr(inputSize, scale1)),
+                b1: new Array(hiddenSize).fill(0),
+                W2: Array.from({ length: numClasses }, () => randArr(hiddenSize, scale2)),
+                b2: new Array(numClasses).fill(0),
+            };
+        }
+
+        function forwardPass(net, x) {
+            const { W1, b1, W2, b2, hiddenSize, numClasses } = net;
+            const h = new Array(hiddenSize);
+            for (let i = 0; i < hiddenSize; i++) {
+                let sum = b1[i];
+                const w = W1[i];
+                for (let j = 0; j < x.length; j++) sum += w[j] * x[j];
+                h[i] = sum > 0 ? sum : 0; // ReLU
+            }
+            const logits = new Array(numClasses);
+            let maxLogit = -Infinity;
+            for (let k = 0; k < numClasses; k++) {
+                let sum = b2[k];
+                const w = W2[k];
+                for (let i = 0; i < hiddenSize; i++) sum += w[i] * h[i];
+                logits[k] = sum;
+                if (sum > maxLogit) maxLogit = sum;
+            }
+            let expSum = 0;
+            const probs = new Array(numClasses);
+            for (let k = 0; k < numClasses; k++) {
+                probs[k] = Math.exp(logits[k] - maxLogit);
+                expSum += probs[k];
+            }
+            for (let k = 0; k < numClasses; k++) probs[k] /= expSum;
+            return { h, probs };
+        }
+
+        function trainStep(net, x, yIndex, lr) {
+            const { h, probs } = forwardPass(net, x);
+            const { hiddenSize, numClasses } = net;
+            const dOut = probs.slice();
+            dOut[yIndex] -= 1; // dLoss/dLogits for softmax + cross-entropy
+
+            const dH = new Array(hiddenSize).fill(0);
+            for (let k = 0; k < numClasses; k++) {
+                const g = dOut[k];
+                if (g === 0) continue;
+                const w2k = net.W2[k];
+                for (let i = 0; i < hiddenSize; i++) {
+                    dH[i] += g * w2k[i];
+                    w2k[i] -= lr * g * h[i];
+                }
+                net.b2[k] -= lr * g;
+            }
+            for (let i = 0; i < hiddenSize; i++) {
+                if (h[i] <= 0) continue; // ReLU gradient is 0 here
+                const g = dH[i];
+                if (g === 0) continue;
+                const w1i = net.W1[i];
+                for (let j = 0; j < x.length; j++) {
+                    w1i[j] -= lr * g * x[j];
+                }
+                net.b1[i] -= lr * g;
+            }
+        }
+
+        function predictWithModel(vector) {
+            if (!model) return '?';
+            const { probs } = forwardPass(model, vector);
+            let best = 0;
+            for (let k = 1; k < probs.length; k++) {
+                if (probs[k] > probs[best]) best = k;
+            }
+            return model.classes[best];
+        }
+
+        // Trains a fresh model from every sample currently in `db`. Runs in small
+        // chunks via setTimeout so the UI thread never freezes, and updates the
+        // settings status line with live progress.
+        function retrainModel(options) {
+            const silent = !!(options && options.silent);
+            const { classes, X, Y } = buildTrainingSet();
+
+            if (classes.length < 2) {
+                if (!silent) {
+                    document.getElementById('output').innerText =
+                        '⚠️ Need at least 2 different trained characters before a model can be built.';
+                }
+                updateRealOcrStatus();
+                return;
+            }
+            if (isTraining) return;
+            isTraining = true;
+            updateRealOcrStatus();
+
+            const hiddenSize = 32;
+            const inputSize = 784;
+            const net = initNetwork(inputSize, hiddenSize, classes.length);
+
+            const N = X.length;
+            const epochs = Math.max(40, Math.min(250, Math.round(15000 / N)));
+            const lr = 0.08;
+            const epochsPerChunk = 5;
+            let epoch = 0;
+
+            function shuffledOrder() {
+                const idx = Array.from({ length: N }, (_, i) => i);
+                for (let i = idx.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [idx[i], idx[j]] = [idx[j], idx[i]];
+                }
+                return idx;
+            }
+
+            function runChunk() {
+                const chunkEnd = Math.min(epoch + epochsPerChunk, epochs);
+                for (; epoch < chunkEnd; epoch++) {
+                    const idx = shuffledOrder();
+                    for (const i of idx) {
+                        trainStep(net, X[i], Y[i], lr);
+                    }
+                }
+                updateRealOcrStatus(`⏳ Training… epoch ${epoch}/${epochs}`);
+                if (epoch < epochs) {
+                    setTimeout(runChunk, 0);
+                } else {
+                    finishTraining();
+                }
+            }
+
+            function finishTraining() {
+                model = {
+                    inputSize, hiddenSize, numClasses: classes.length, classes,
+                    W1: net.W1, b1: net.b1, W2: net.W2, b2: net.b2,
+                    trainedAt: new Date().toISOString(),
+                    sampleCount: N
+                };
+                try {
+                    storage.set('custom_ocr_model', JSON.stringify(model));
+                } catch (e) {
+                    console.warn('Could not persist trained model.', e);
+                }
+                isTraining = false;
+                updateRealOcrStatus();
+                if (!silent) {
+                    document.getElementById('output').innerText =
+                        `✅ Model trained on ${N} sample(s) across ${classes.length} character(s).`;
+                }
+            }
+
+            runChunk();
+        }
+
+        // Called after new samples are added. Only auto-retrains when Real OCR is
+        // on, and debounces so a burst of new samples (e.g. the A-Z trainer) only
+        // triggers one retrain instead of one per sample.
+        function scheduleLiveRetrain() {
+            if (!realOcrMode) return;
+            if (retrainDebounceTimer) clearTimeout(retrainDebounceTimer);
+            retrainDebounceTimer = setTimeout(() => {
+                retrainModel({ silent: true });
+            }, 900);
+        }
+
+        // --- TAB 1: SINGLE TRAINER ---
+        function saveSingle() {
+            const char = document.getElementById('charInput').value.trim();
+            if (!char) {
+                document.getElementById('output').innerText = '⚠️ Type target character!';
+                return;
+            }
+            const cvs = document.getElementById('canvasSingle');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+
+            db.push({ char: char, vector: vec });
+            persistDb();
+            scheduleLiveRetrain();
+
+            document.getElementById('output').innerText = `Saved '${char}'!`;
+            document.getElementById('charInput').value = '';
+            clearCanvas('canvasSingle');
+            updateStats();
+        }
+
+        function recognizeSingle() {
+            const cvs = document.getElementById('canvasSingle');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+            const match = classifyVector(vec);
+            document.getElementById('output').innerText = `Result: ${match}`;
+        }
+
+        // --- TAB 2: GUIDED TRAINER ---
+        function initGuidedStep() {
+            if (guidedIndex >= FULL_SET.length) guidedIndex = 0;
+            document.getElementById('guidedTarget').innerText = FULL_SET[guidedIndex];
+            document.getElementById('guidedStatus').innerText = "Draw character, then tap 'Verify & Next'";
+            clearCanvas('canvasGuided');
+        }
+
+        function processGuidedStep() {
+            const targetChar = FULL_SET[guidedIndex];
+            const cvs = document.getElementById('canvasGuided');
+            const bbox = getCanvasBoundingBox(cvs);
+            const vec = extractVectorFromBoundingBox(cvs, bbox);
+
+            const detected = classifyVector(vec);
+
+            if (detected === targetChar) {
+                document.getElementById('output').innerText = `✅ Detected '${detected}' correctly! Next...`;
+                guidedIndex++;
+                setTimeout(initGuidedStep, 600);
+            } else {
+                db.push({ char: targetChar, vector: vec });
+                persistDb();
+                scheduleLiveRetrain();
+                updateStats();
+
+                document.getElementById('output').innerText = `❌ Detected '${detected}'. Saved pattern for '${targetChar}'. Draw again!`;
+                clearCanvas('canvasGuided');
+            }
+        }
+
+        // --- TAB 3: FULL DOCUMENT OCR WITH COMPONENT MERGING ---
+        function loadDocImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                docImg = new Image();
+                docImg.onload = () => drawDocToCanvas();
+                docImg.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function drawDocToCanvas() {
+            const cvs = document.getElementById('canvasDoc');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            if (docImg) {
+                ctx.drawImage(docImg, 0, 0, cvs.width, cvs.height);
+                preprocessDocImage(cvs);
+            }
+            ctx.strokeStyle = '#ff453a';
+            ctx.lineWidth = 2;
+            manualBarriers.forEach(x => {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, cvs.height);
+                ctx.stroke();
+            });
+        }
+
+        // Uploaded photos are fully opaque (alpha=255 everywhere), but the rest of
+        // this pipeline (bounding box detection, connected components, vector
+        // extraction) all key off the ALPHA channel to mean "ink here" — that
+        // convention comes from the hand-drawn canvases, which paint white strokes
+        // on a transparent background. Without this step, an uploaded image reads
+        // as one giant uniform blob and always classifies as whatever trained
+        // sample happens to sit closest to a constant vector.
+        // This converts real light/dark pixel values into that same alpha-encoded
+        // "ink" convention: whichever tone (light or dark) is the minority in the
+        // image becomes opaque "ink", and the majority tone becomes transparent
+        // background. This works for both dark-ink-on-light-paper and
+        // light-ink-on-dark-background photos without assuming either direction.
+        function preprocessDocImage(cvs) {
+            const ctx = cvs.getContext('2d');
+            const w = cvs.width, h = cvs.height;
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+            const pixelCount = data.length / 4;
+
+            let minLum = 255, maxLum = 0;
+            const lums = new Float32Array(pixelCount);
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                lums[p] = lum;
+                if (lum < minLum) minLum = lum;
+                if (lum > maxLum) maxLum = lum;
+            }
+            const threshold = (minLum + maxLum) / 2;
+
+            // Count how many pixels fall on each side of the threshold, so we can
+            // tell which side (dark or light) is the minority — that's the ink.
+            let darkCount = 0;
+            for (let p = 0; p < pixelCount; p++) {
+                if (lums[p] < threshold) darkCount++;
+            }
+            const lightCount = pixelCount - darkCount;
+            const inkIsDark = darkCount <= lightCount;
+
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                const isDark = lums[p] < threshold;
+                const isInk = inkIsDark ? isDark : !isDark;
+                data[i] = 255;
+                data[i + 1] = 255;
+                data[i + 2] = 255;
+                data[i + 3] = isInk ? 255 : 0;
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function handleDocTap(xPos) {
+            if (!docImg) return;
+            manualBarriers.push(xPos);
+            manualBarriers.sort((a, b) => a - b);
+            drawDocToCanvas();
+        }
+
+        function clearDoc() {
+            manualBarriers = [];
+            drawDocToCanvas();
+            document.getElementById('output').innerText = '';
+        }
+
+        function runDocOCR() {
+            const cvs = document.getElementById('canvasDoc');
+            const ctx = cvs.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
+            const w = cvs.width;
+            const h = cvs.height;
+            const data = imgData.data;
+
+            // Step 1: Flood-Fill / Connected Components Detection
+            const visited = new Uint8Array(w * h);
+            let components = [];
+
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    // Check if pixel is drawn & not visited
+                    if (data[idx * 4 + 3] > 40 && !visited[idx]) {
+
+                        // Check manual vertical barrier collision
+                        if (manualBarriers.some(bx => Math.abs(bx - x) < 2)) continue;
+
+                        // Start BFS to extract component
+                        let minX = x, maxX = x, minY = y, maxY = y;
+                        let queue = [x, y];
+                        visited[idx] = 1;
+
+                        let head = 0;
+                        while(head < queue.length) {
+                            const cx = queue[head++];
+                            const cy = queue[head++];
+
+                            if (cx < minX) minX = cx;
+                            if (cx > maxX) maxX = cx;
+                            if (cy < minY) minY = cy;
+                            if (cy > maxY) maxY = cy;
+
+                            // Check 4-directional neighbors
+                            const neighbors = [
+                                [cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]
+                            ];
+
+                            for (let n = 0; n < neighbors.length; n++) {
+                                const nx = neighbors[n][0];
+                                const ny = neighbors[n][1];
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                                    const nIdx = ny * w + nx;
+                                    // Respect manual barriers
+                                    const isBarrier = manualBarriers.some(bx => Math.abs(bx - nx) < 2);
+                                    if (!visited[nIdx] && data[nIdx * 4 + 3] > 40 && !isBarrier) {
+                                        visited[nIdx] = 1;
+                                        queue.push(nx, ny);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Filter out single pixel noise
+                        if ((maxX - minX) > 1 || (maxY - minY) > 1) {
+                            components.push({ minX, maxX, minY, maxY });
+                        }
+                    }
+                }
+            }
+
+            // Step 2: MERGE FLOATING DOTS & DIACRITICS (i, j, ä, ö, ü)
+            // Only merge a component into another if it's genuinely dot-sized and
+            // sits above it — otherwise this step was merging entire neighboring
+            // letters together any time they were drawn close together, and it
+            // ignored manual barriers entirely, both of which produced badly wrong
+            // single blobs instead of separate characters.
+            function barrierBetween(a, b) {
+                const spanMin = Math.min(a.minX, b.minX);
+                const spanMax = Math.max(a.maxX, b.maxX);
+                return manualBarriers.some(bx => bx > spanMin && bx < spanMax);
+            }
+
+            function isDotAbove(dot, stem) {
+                const dotHeight = dot.maxY - dot.minY;
+                const dotWidth = dot.maxX - dot.minX;
+                const stemHeight = stem.maxY - stem.minY;
+                const isSmall = dotHeight < stemHeight * 0.5 && dotWidth < stemHeight * 0.6;
+                const sitsAbove = dot.maxY <= stem.minY + 12;
+                const xOverlap = !(dot.maxX < stem.minX - 4 || dot.minX > stem.maxX + 4);
+                return isSmall && sitsAbove && xOverlap;
+            }
+
+            let mergedBoxes = [];
+            const byHeightDesc = [...components].sort((a, b) => (b.maxY - b.minY) - (a.maxY - a.minY));
+            byHeightDesc.forEach(comp => {
+                let merged = false;
+                for (let m = 0; m < mergedBoxes.length; m++) {
+                    let target = mergedBoxes[m];
+
+                    if (barrierBetween(comp, target)) continue;
+
+                    if (isDotAbove(comp, target) || isDotAbove(target, comp)) {
+                        target.minX = Math.min(target.minX, comp.minX);
+                        target.maxX = Math.max(target.maxX, comp.maxX);
+                        target.minY = Math.min(target.minY, comp.minY);
+                        target.maxY = Math.max(target.maxY, comp.maxY);
+                        merged = true;
+                        break;
+                    }
+                }
+                if (!merged) {
+                    mergedBoxes.push({ ...comp });
+                }
+            });
+
+            // Sort character boxes left-to-right
+            mergedBoxes.sort((a, b) => a.minX - b.minX);
+
+            // Step 3: Run KNN classification per merged box
+            let textOutput = "";
+            mergedBoxes.forEach(box => {
+                const vec = extractVectorFromBoundingBox(cvs, box);
+                textOutput += classifyVector(vec);
+            });
+
+            document.getElementById('output').innerText = `Parsed File: ${textOutput || 'No text detected'}`;
+        }
+
+        // --- TAB 5: TEXT -> HANDWRITING RENDERER ---
+        function clearHandwriteCanvas() {
+            const cvs = document.getElementById('canvasHandwrite');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            document.getElementById('output').innerText = '';
+        }
+
+        // Draws a stored 28x28 alpha vector (white ink on transparent) onto a
+        // target canvas at (x, y), scaled to `size` px, with a small random
+        // rotation/jitter so repeated letters don't look robotically identical.
+        function drawVectorAt(ctx, vector, x, y, size) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+            const imgData = tCtx.createImageData(28, 28);
+            for (let i = 0; i < vector.length; i++) {
+                const alpha = Math.round(vector[i] * 255);
+                imgData.data[i * 4] = 255;
+                imgData.data[i * 4 + 1] = 255;
+                imgData.data[i * 4 + 2] = 255;
+                imgData.data[i * 4 + 3] = alpha;
+            }
+            tCtx.putImageData(imgData, 0, 0);
+
+            const jitterAngle = (Math.random() - 0.5) * 0.15; // slight random tilt
+            const jitterY = (Math.random() - 0.5) * 6;
+
+            ctx.save();
+            ctx.translate(x + size / 2, y + size / 2 + jitterY);
+            ctx.rotate(jitterAngle);
+            ctx.drawImage(temp, -size / 2, -size / 2, size, size);
+            ctx.restore();
+        }
+
+        function renderHandwriting() {
+            const text = document.getElementById('typeInput').value;
+            const cvs = document.getElementById('canvasHandwrite');
+            const ctx = cvs.getContext('2d');
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+            if (!text) {
+                document.getElementById('output').innerText = '⚠️ Type something first!';
+                return;
+            }
+
+            const charSize = 32;
+            const lineHeight = 40;
+            const marginX = 10;
+            let cursorX = marginX;
+            let cursorY = 10;
+            let untrainedSeen = new Set();
+            let renderedCount = 0;
+
+            for (const ch of text) {
+                if (ch === '\n') {
+                    cursorX = marginX;
+                    cursorY += lineHeight;
+                    continue;
+                }
+                if (ch === ' ') {
+                    cursorX += charSize * 0.6;
+                    continue;
+                }
+                if (cursorX > cvs.width - charSize - marginX) {
+                    cursorX = marginX;
+                    cursorY += lineHeight;
+                }
+                if (cursorY > cvs.height - lineHeight) break; // ran out of room
+
+                // OCR Premium™: our proprietary Z-Vision™ engine handwrites
+                // everything as 'z' too, on brand with its detection "skill".
+                const lookupChar = premiumMode ? 'z' : ch;
+                const matches = db.filter(e => e.char === lookupChar);
+
+                if (matches.length === 0) {
+                    // Untrained character: draw a clearly visible placeholder box
+                    untrainedSeen.add(lookupChar);
+                    ctx.save();
+                    ctx.strokeStyle = '#ff9f0a';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 3]);
+                    ctx.strokeRect(cursorX, cursorY, charSize * 0.7, charSize);
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#ff9f0a';
+                    ctx.font = '12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('?', cursorX + charSize * 0.35, cursorY + charSize / 2 + 4);
+                    ctx.restore();
+                    cursorX += charSize * 0.85;
+                    continue;
+                }
+
+                const pick = matches[Math.floor(Math.random() * matches.length)];
+                drawVectorAt(ctx, pick.vector, cursorX, cursorY, charSize);
+                cursorX += charSize * 0.82;
+                renderedCount++;
+            }
+
+            let statusMsg = premiumMode
+                ? `✅ OCR Premium: rendered ${renderedCount} character(s) as 'z'.`
+                : `✅ Rendered ${renderedCount} character(s).`;
+            if (untrainedSeen.size > 0) {
+                statusMsg += ` Missing training for: ${[...untrainedSeen].join(' ')}`;
+            }
+            document.getElementById('output').innerText = statusMsg;
+        }
+
+        // --- TAB 4: TRAINING MATRIX GRID ---
+        let selectedChar = null;
+
+        function buildMatrix() {
+            const grid = document.getElementById('gridContainer');
+            grid.innerHTML = '';
+
+            FULL_SET.forEach(char => {
+                const count = db.filter(e => e.char === char).length;
+                const cell = document.createElement('div');
+                cell.className = `grid-cell ${count > 0 ? 'trained' : 'un-trained'}`;
+                cell.innerText = `${char} (${count})`;
+                if (count > 0) {
+                    cell.style.cursor = 'pointer';
+                    cell.onclick = () => openCharacterSamples(char);
+                }
+                grid.appendChild(cell);
+            });
+
+            if (selectedChar) renderCharacterSamples();
+        }
+
+        // Shows every individual saved sample for one character as a thumbnail,
+        // each with its own delete button — for when a mistaken sample (like an
+        // 'a' saved under 'ä') is throwing off recognition for that character.
+        function openCharacterSamples(char) {
+            selectedChar = char;
+            renderCharacterSamples();
+        }
+
+        function closeSampleViewer() {
+            selectedChar = null;
+            const panel = document.getElementById('sampleViewer');
+            if (panel) panel.style.display = 'none';
+        }
+
+        function renderCharacterSamples() {
+            const panel = document.getElementById('sampleViewer');
+            const grid = document.getElementById('sampleGrid');
+            const title = document.getElementById('sampleViewerTitle');
+            if (!panel || !grid || !title || !selectedChar) return;
+
+            const entries = db
+                .map((entry, index) => ({ entry, index }))
+                .filter(o => o.entry.char === selectedChar);
+
+            if (entries.length === 0) {
+                closeSampleViewer();
+                return;
+            }
+
+            panel.style.display = 'block';
+            title.textContent = `'${selectedChar}' — ${entries.length} sample(s)`;
+            grid.innerHTML = '';
+
+            entries.forEach(({ entry, index }) => {
+                const tile = document.createElement('div');
+                tile.className = 'sample-tile';
+
+                const img = document.createElement('img');
+                img.src = vectorToPngDataURL(entry.vector);
+                tile.appendChild(img);
+
+                const del = document.createElement('button');
+                del.className = 'sample-delete-btn';
+                del.innerText = '✕';
+                del.onclick = (ev) => {
+                    ev.stopPropagation();
+                    deleteSample(index);
+                };
+                tile.appendChild(del);
+
+                grid.appendChild(tile);
+            });
+        }
+
+        function deleteSample(index) {
+            const removedChar = db[index] ? db[index].char : selectedChar;
+            db.splice(index, 1);
+            persistDb();
+            scheduleLiveRetrain();
+            updateStats();
+            buildMatrix();
+            renderCharacterSamples();
+            document.getElementById('output').innerText = `Deleted 1 sample of '${removedChar}'.`;
+        }
+
+        function deleteAllForSelectedChar() {
+            if (!selectedChar) return;
+            if (!confirm(`Delete all saved samples of '${selectedChar}'?`)) return;
+            db = db.filter(e => e.char !== selectedChar);
+            persistDb();
+            scheduleLiveRetrain();
+            updateStats();
+            const deletedChar = selectedChar;
+            closeSampleViewer();
+            buildMatrix();
+            document.getElementById('output').innerText = `Deleted all samples of '${deletedChar}'.`;
+        }
+
+        function updateStats() {
+            const label = storage.isAvailable ? 'Saved patterns' : 'Saved patterns (session only)';
+            document.getElementById('stats').innerText = `${label}: ${db.length}`;
+        }
+
+        function clearDB() {
+            if (confirm("Reset entire custom OCR training database?")) {
+                db = [];
+                model = null;
+                try {
+                    storage.remove('custom_ocr_db');
+                    storage.remove('custom_ocr_model');
+                } catch (e) { /* ignore */ }
+                closeSampleViewer();
+                updateStats();
+                buildMatrix();
+                updateRealOcrStatus();
+                document.getElementById('output').innerText = 'DB Wiped!';
+            }
+        }
+
+        // --- .ZOODLE FORMAT ---
+        // A "Zoo of Doodles": each trained character becomes a real, lossless
+        // 28x28 PNG (so it's genuinely an image, not a JSON array of 784 raw
+        // floats) paired with its plain-text label, in one human-readable file.
+        // Layout:
+        //   ZOODLE1                     <- magic/version line
+        //   # comments starting with #  <- ignored by the parser
+        //   COUNT=<n>
+        //   >>>CHAR_LABEL
+        //   <base64-encoded PNG bytes>
+        //   <<<
+        //   ...repeated per sample...
+
+        const ZOODLE_MAGIC = 'ZOODLE1';
+
+        function vectorToPngDataURL(vector) {
+            const temp = document.createElement('canvas');
+            temp.width = 28; temp.height = 28;
+            const tCtx = temp.getContext('2d');
+            const imgData = tCtx.createImageData(28, 28);
+            for (let i = 0; i < vector.length; i++) {
+                imgData.data[i * 4] = 255;
+                imgData.data[i * 4 + 1] = 255;
+                imgData.data[i * 4 + 2] = 255;
+                imgData.data[i * 4 + 3] = Math.round(vector[i] * 255);
+            }
+            tCtx.putImageData(imgData, 0, 0);
+            return temp.toDataURL('image/png'); // lossless, alpha-preserving
+        }
+
+        function pngDataURLToVector(dataURL) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const temp = document.createElement('canvas');
+                    temp.width = 28; temp.height = 28;
+                    const tCtx = temp.getContext('2d');
+                    tCtx.drawImage(img, 0, 0, 28, 28);
+                    const data = tCtx.getImageData(0, 0, 28, 28).data;
+                    const vector = [];
+                    for (let i = 0; i < data.length; i += 4) {
+                        vector.push(data[i + 3] / 255.0);
+                    }
+                    resolve(vector);
+                };
+                img.onerror = reject;
+                img.src = dataURL;
+            });
+        }
+
+        function exportTrainedData() {
+            if (db.length === 0) {
+                document.getElementById('output').innerText = '⚠️ Nothing trained yet — nothing to export!';
+                return;
+            }
+
+            let out = [];
+            out.push(ZOODLE_MAGIC);
+            out.push('# .zoodle file — a Zoo of Doodles.');
+            out.push('# Each block below is one trained character: a text label,');
+            out.push('# then a real lossless PNG of its stroke data as base64.');
+            out.push('# Exported from Custom OCR Suite on ' + new Date().toISOString());
+            out.push(`COUNT=${db.length}`);
+
+            db.forEach(entry => {
+                const dataURL = vectorToPngDataURL(entry.vector);
+                const base64 = dataURL.split(',')[1];
+                out.push(`>>>${entry.char}`);
+                out.push(base64);
+                out.push('<<<');
+            });
+
+            const blob = new Blob([out.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ocr-training-data-${Date.now()}.zoodle`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            document.getElementById('output').innerText = `✅ Exported ${db.length} samples as .zoodle`;
+        }
+
+        function importTrainedData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const text = event.target.result;
+                    const lines = text.split('\n');
+
+                    if (lines[0].trim() !== ZOODLE_MAGIC) {
+                        document.getElementById('output').innerText =
+                            "⚠️ That doesn't look like a .zoodle file (missing header). Import aborted.";
+                        return;
+                    }
+
+                    const entries = [];
+                    let i = 0;
+                    while (i < lines.length) {
+                        const line = lines[i];
+                        if (line.startsWith('>>>')) {
+                            const char = line.slice(3);
+                            const base64Lines = [];
+                            i++;
+                            while (i < lines.length && lines[i].trim() !== '<<<') {
+                                base64Lines.push(lines[i]);
+                                i++;
+                            }
+                            entries.push({ char, base64: base64Lines.join('') });
+                        }
+                        i++;
+                    }
+
+                    if (entries.length === 0) {
+                        document.getElementById('output').innerText =
+                            '⚠️ No character entries found in that file.';
+                        return;
+                    }
+
+                    const decoded = await Promise.all(
+                        entries.map(async (entry) => {
+                            const vector = await pngDataURLToVector('data:image/png;base64,' + entry.base64);
+                            return { char: entry.char, vector };
+                        })
+                    );
+
+                    decoded.forEach(d => db.push(d));
+                    persistDb();
+                    scheduleLiveRetrain();
+                    updateStats();
+                    buildMatrix();
+
+                    document.getElementById('output').innerText =
+                        `✅ Imported ${decoded.length} samples from .zoodle (added to existing ${db.length - decoded.length}).`;
+                } catch (err) {
+                    console.error('Zoodle import failed:', err);
+                    document.getElementById('output').innerText =
+                        '❌ Failed to import — file may be corrupted or not a valid .zoodle.';
+                } finally {
+                    e.target.value = ''; // allow re-selecting the same file later
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
