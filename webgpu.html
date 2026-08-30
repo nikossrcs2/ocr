@@ -669,7 +669,11 @@
                 gpuDevice.queue.submit([encoder.finish()]);
 
                 await readBuffer.mapAsync(GPUMapMode.READ);
-                const result = new Float32Array(readBuffer.getMappedRange());
+                // IMPORTANT: getMappedRange() returns a view over memory that gets
+                // detached the moment unmap() is called. Copy the data out first,
+                // otherwise every read after unmap() silently returns 0/undefined,
+                // which made the argmax below always stick at index 0.
+                const result = new Float32Array(readBuffer.getMappedRange().slice(0));
                 readBuffer.unmap();
 
                 let best = 0;
